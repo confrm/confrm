@@ -28,9 +28,7 @@ import uvicorn
 
 
 def check_config_file(config):
-    '''
-    Check that the config file contains the required fields
-    '''
+    """Check that the config file contains the required fields"""
 
     elements = ["basic", "storage"]
     for element in elements:
@@ -57,9 +55,7 @@ def check_config_file(config):
 
 
 def main():
-    """
-    Its the main method, here's to pylint nirvana
-    """
+    """It is the main method, here's to pylint nirvana"""
 
     parser = argparse.ArgumentParser(description="confrm Server Application")
     parser.add_argument("--config", type=str, help="Path to config.toml")
