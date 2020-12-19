@@ -70,12 +70,10 @@ def main():
     os.environ["CONFRM_CONFIG"] = args.config
 
     # Important that workers = 1 in order to use tinydb, more than one
-    # worker may cause issues workng with information in the db.
+    # worker may cause issues working with information in the db.
     uvicorn.run(
             "confrm:APP",
             host="10.0.1.106",
-            ssl_keyfile="../key.pem",
-            ssl_certfile="../cert.pem",
             workers=1)
 
 if __name__ == "__main__":
