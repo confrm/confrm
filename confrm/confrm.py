@@ -1,35 +1,55 @@
-""" Main FastAPI Implementation of confrm """
+"""Main FastAPI Implementation of confrm
+
+Copyright 2020 confrm.io
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+"""
 
 import base64
 import logging
 import os
-import uuid
-import operator
 import time
+import uuid
+
 import toml
 
-from confrm.responses import ConfrmFileResponse
 from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
-from Crypto.Signature.pkcs1_15 import PKCS115_SigScheme
-from hashlib import sha256
-from fastapi import FastAPI, File, Depends, UploadFile
+from fastapi import FastAPI, File, Depends
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from tinydb import TinyDB, Query
 from markupsafe import escape
-from pydantic import BaseModel
+from pydantic import BaseModel # pylint: disable=E0611
+
+from confrm.responses import ConfrmFileResponse
 
 logger = logging.getLogger('confrm')
 logger.setLevel(logging.INFO)
 
-class Package(BaseModel):
+# pydantic data models are used to describe the inputs for the various REST
+# API calls, if the calls do not match these names and data-types then the call
+# to FastAPI will fail
+
+class Package(BaseModel): #pylint: disable=R0903
+    """Definition of a package"""
     name: str
     title: str
     description: str
     platform: str
 
-class PackageVersion(BaseModel):
+class PackageVersion(BaseModel): #pylint: disable=R0903
+    """Definition of a package version"""
     name: str
     major: int
     minor: int
@@ -40,7 +60,7 @@ CONFIG = None
 DB = None
 
 def do_config():
-    """ Gets the config based on an environment variable and sets up global
+    """Gets the config based on an environment variable and sets up global
     objects as required """
 
     global CONFIG, DB # pylint: disable=W0603
@@ -50,8 +70,9 @@ def do_config():
     # Create the database from the data store
     DB = TinyDB(os.path.join(CONFIG["storage"]["data_dir"], "confrm_db.json"))
 
+
 def get_package_versions(name: str, package: {} = None):
-    """ Handles the version ordering logic
+    """Handles the version ordering logic
 
     Versions are sorted to be in descending order, with the currently
     active version at the top of the list (position 0)
@@ -97,8 +118,16 @@ def get_package_versions(name: str, package: {} = None):
 
     return versions
 
+
 def format_package_info(package: dict, lite: bool = False):
-    """ Formats data in to correct dict form """
+    """Formats data in to correct dict form
+
+    Can generate long form (for UI) or short form  / lite (for nodes)
+
+    Attributes:
+        package (dict): package dict from DB
+        lite (bool): if true a reduced response is generated
+    """
 
     current_version = ""
     if "current_version" in package.keys():
@@ -125,34 +154,46 @@ def format_package_info(package: dict, lite: bool = False):
        "versions" : versions
     }
 
-privateKey = RSA.generate(bits=1024)
 
+# Files server in /static will point to ./dashboard (with respect to the running
+# script)
 APP.mount("/static", StaticFiles(directory="dashboard"), name="home")
 
 @APP.get("/")
 async def index():
-    """ Returns index page for UI """
+    """Returns index page for UI"""
     return FileResponse("dashboard/index.html")
+
 
 @APP.get("/info/")
 async def get_info():
-    """ Get basic info for UI elements """
-
+    """Get basic info for UI elements"""
     if CONFIG is None:
         do_config()
+
     ret = {}
     packages = DB.table('packages')
     ret["packages_installed"] = len(packages)
+
     return ret
 
 @APP.get("/time/")
 async def get_time():
+    """Returns time of day from server as unix epoch time"""
     if CONFIG is None:
         do_config()
+
     return { "time": round(time.time()) }
 
 @APP.get("/register_node/")
 async def register_node(node_id: str, package: str, version: str):
+    """Registers a node to the server
+
+    Attributes:
+        node_id (str): The node id, must be unique, MAC addresses work well
+        package (str): Package installed on the node
+        version (str): Version string of currently running package
+    """
     if CONFIG is None:
         do_config()
 
@@ -177,11 +218,13 @@ async def register_node(node_id: str, package: str, version: str):
         nodes.insert(entry)
         return {"ok": True}
 
+    # Update the package entry based on package name change, new verion of a package
+    # and register this as the last update time
     if node_entry["package"] != package: # Package changed
         node_entry["package"] = package
         node_entry["version"] = version
         node_entry["last_updated"] = -1
-    elif node_entry["version"] != version:
+    elif node_entry["version"] != version: # Version of package changed
         node_entry["version"] = version
         node_entry["last_updated"] = round(time.time())
     node_entry["last_seen"] = round(time.time())
@@ -192,6 +235,11 @@ async def register_node(node_id: str, package: str, version: str):
 
 @APP.get("/get_nodes/")
 async def get_nodes(package: str):
+    """Retruns a list of nodes using a given package
+    
+    Attributes:
+        package (str): name of package to return node list for
+    """
     if CONFIG is None:
         do_config()
 
@@ -200,10 +248,9 @@ async def get_nodes(package: str):
 
     node_list = nodes.search(query.package == package)
 
-    print(nodes.all())
-
     if len(node_list) == 0:
         return {}
+
     return node_list
 
 @APP.get("/packages/")
@@ -219,7 +266,7 @@ async def get_package_list():
     # the UI - unique 'name' fields, with multiple 'versions'
     ui_packages = {}
     for package in packages:
-        ui_packages[package["name"]] = format_package_info(package);
+        ui_packages[package["name"]] = format_package_info(package)
 
 
     return ui_packages
@@ -334,8 +381,6 @@ async def get_package(name: str, lite: bool = False):
 #        print(blob_hash)
 #        print(hashFromSig)
 
-        
-
         return format_package_info(package, lite)
 
     return {}
@@ -432,5 +477,3 @@ async def get_blob(name: str, blob: str):
         return
 
     return ConfrmFileResponse(data)
-
-

@@ -1,5 +1,4 @@
-"""
-Custom FastAPI Response handler for sending data from memory as a file
+"""Custom FastAPI Response handler for sending data from memory as a file
 
 Copyright 2020 confrm.io
 
