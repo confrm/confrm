@@ -177,6 +177,7 @@ async def get_info():
 
     return ret
 
+
 @APP.get("/time/")
 async def get_time():
     """Returns time of day from server as unix epoch time"""
@@ -184,6 +185,7 @@ async def get_time():
         do_config()
 
     return { "time": round(time.time()) }
+
 
 @APP.get("/register_node/")
 async def register_node(node_id: str, package: str, version: str):
@@ -233,10 +235,11 @@ async def register_node(node_id: str, package: str, version: str):
 
     return {"ok": True}
 
+
 @APP.get("/get_nodes/")
 async def get_nodes(package: str):
-    """Retruns a list of nodes using a given package
-    
+    """Returns a list of nodes using a given package
+
     Attributes:
         package (str): name of package to return node list for
     """
@@ -253,10 +256,10 @@ async def get_nodes(package: str):
 
     return node_list
 
+
 @APP.get("/packages/")
 async def get_package_list():
-    """ Get package list and process for displaying on the UI """
-
+    """Get package list and process for displaying on the UI """
     if CONFIG is None:
         do_config()
 
@@ -268,12 +271,16 @@ async def get_package_list():
     for package in packages:
         ui_packages[package["name"]] = format_package_info(package)
 
-
     return ui_packages
+
 
 @APP.post("/add_package/")
 async def add_package(package: Package = Depends()):
-    """ Uploads a package with optional binary package """
+    """Uploads a package with optional binary package
+
+    Attributes:
+        package (Package): Package description to be added
+    """
     if CONFIG is None:
         do_config()
 
@@ -285,10 +292,16 @@ async def add_package(package: Package = Depends()):
         if str == type(package_dict[key]):
             package_dict[key] = escape(package_dict[key])
 
-    # Store in the database
     packages = DB.table("packages")
+    query = Query()
+
+    existing_name = packages.get(query.name == package_dict.name)
+    if existing_name is not None:
+        return {"ok": False} # TODO: Return more useful error
+
     packages.insert(package_dict)
 
+    return {"ok": True}
 
 @APP.post("/add_package_version/")
 async def add_package_version(package_version: PackageVersion = Depends(), file: bytes = File(...)):
