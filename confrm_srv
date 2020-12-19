@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+
+import argparse
+import confrm
+import logging
+import os
+import toml
+import uvicorn
+
+from confrm.responses import ConfrmFileResponse
+from Crypto.PublicKey import RSA
+from Crypto.Signature.pkcs1_15 import PKCS115_SigScheme
+from hashlib import sha256
+from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from tinydb import TinyDB, Query
+from pydantic import BaseModel
+
+logger = logging.getLogger('confrm')
+logger.setLevel(logging.INFO)
+
+DB = None
+
+def check_config_file(config):
+    '''
+    Check that the config file contains the required fields
+    '''
+
+    elements = ["basic", "storage"]
+    for element in elements:
+        if element not in config.keys():
+            raise Exception(f"Config does not contain '{element}' element")
+    basic_names = ["port"]
+    for name in basic_names:
+        if name not in config["basic"].keys():
+            raise Exception(
+                f"Config element 'basic' does not contain '{name}'"
+            )
+    storage_names = ["data_dir"]
+    for name in storage_names:
+        if name not in config["storage"].keys():
+            raise Exception(
+                f"Config element 'storage' does not contain '{name}'"
+            )
+
+    # Additional checks based on data content
+    if os.path.exists(config["storage"]["data_dir"]) is False:
+        raise Exception(
+            f"'data_dir' {config['storage']['data_dir']}does not exists"
+        )
+
+def init_db():
+
+    global DB # pylint: disable=w0603
+
+    logger.info("Creating database tables")
+
+    _packages = DB.table('packages')
+    _package_versions = DB.table("package_versions")
+    _nodes = DB.table('nodes')
+    _keys = DB.table('keys')
+
+def main():
+
+    global DB # pylint: disable=w0603
+
+    parser = argparse.ArgumentParser(description="confrm Server Application")
+    parser.add_argument("--config", type=str, help="Path to config.toml")
+    args = parser.parse_args()
+
+    if os.path.isfile(args.config) is False:
+        raise Exception("Config file does not exists")
+
+    config = toml.load(args.config)
+    check_config_file(config)
+
+    db_init_required = False
+    db_path = os.path.join(config["storage"]["data_dir"], "confrm_db.json")
+    if os.path.isfile(db_path) is False:
+        db_init_required = True
+    DB = TinyDB(db_path)
+
+    if db_init_required:
+        init_db()
+
+    DB.drop_table("nodes")
+    DB.close()
+
+    os.environ["CONFRM_CONFIG"] = args.config
+
+    uvicorn.run(
+            "confrm:APP",
+            host="10.0.1.106",
+            ssl_keyfile="../key.pem",
+            ssl_certfile="../cert.pem",
+            workers=1)
+
+if __name__ == "__main__":
+    main()
