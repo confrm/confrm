@@ -25,7 +25,7 @@ import toml
 
 from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
-from fastapi import FastAPI, File, Depends
+from fastapi import FastAPI, File, Depends, Response, status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from tinydb import TinyDB, Query
@@ -166,7 +166,7 @@ async def index():
 
 
 @APP.get("/info/")
-async def get_info():
+async def info():
     """Get basic info for UI elements"""
     if CONFIG is None:
         do_config()
@@ -187,14 +187,19 @@ async def get_time():
     return { "time": round(time.time()) }
 
 
-@APP.get("/register_node/")
-async def register_node(node_id: str, package: str, version: str):
+@APP.put("/register_node/", status_code=status.HTTP_200_OK)
+async def register_node(node_id: str, package: str, version: str, response: Response):
     """Registers a node to the server
 
     Attributes:
         node_id (str): The node id, must be unique, MAC addresses work well
         package (str): Package installed on the node
         version (str): Version string of currently running package
+        response (Response): Starlette response object for setting return codes
+
+    Returns:
+        HTTP_200_OK / {} if registration successful
+        HTTP_404_NOT_FOUND / {"info": msg} if not successful, information is msg
     """
     if CONFIG is None:
         do_config()
@@ -206,7 +211,8 @@ async def register_node(node_id: str, package: str, version: str):
 
     package_entry = packages.get(query.name == package)
     if package_entry is None:
-        return {"ok": False} # Package not found in package DB
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return {"info": "Unknown package name"}
 
     node_entry = nodes.get(query.node_id == node_id)
     if node_entry is None:
@@ -218,9 +224,9 @@ async def register_node(node_id: str, package: str, version: str):
                 "last_seen": round(time.time())
         }
         nodes.insert(entry)
-        return {"ok": True}
+        return {}
 
-    # Update the package entry based on package name change, new verion of a package
+    # Update the package entry based on package name change, new version of a package
     # and register this as the last update time
     if node_entry["package"] != package: # Package changed
         node_entry["package"] = package
@@ -233,10 +239,10 @@ async def register_node(node_id: str, package: str, version: str):
 
     nodes.update(node_entry, query.node_id == node_id)
 
-    return {"ok": True}
+    return {}
 
 
-@APP.get("/get_nodes/")
+@APP.get("/nodes/")
 async def get_nodes(package: str):
     """Returns a list of nodes using a given package
 
@@ -258,7 +264,7 @@ async def get_nodes(package: str):
 
 
 @APP.get("/packages/")
-async def get_package_list():
+async def package_list():
     """Get package list and process for displaying on the UI """
     if CONFIG is None:
         do_config()
@@ -295,7 +301,7 @@ async def add_package(package: Package = Depends()):
     packages = DB.table("packages")
     query = Query()
 
-    existing_name = packages.get(query.name == package_dict.name)
+    existing_name = packages.get(query.name == package_dict["name"])
     if existing_name is not None:
         return {"ok": False} # TODO: Return more useful error
 
@@ -303,7 +309,7 @@ async def add_package(package: Package = Depends()):
 
     return {"ok": True}
 
-@APP.post("/add_package_version/")
+@APP.post("/package_version/")
 async def add_package_version(package_version: PackageVersion = Depends(), file: bytes = File(...)):
     """ Uploads a package with optional binary package """
     if CONFIG is None:
@@ -338,7 +344,7 @@ async def add_package_version(package_version: PackageVersion = Depends(), file:
 
     return {"ok": True}
 
-@APP.get("/del_package_version/")
+@APP.delete("/package_version/")
 async def del_package_version(name: str, version: str):
     """ Delete a version """
     if CONFIG is None:
@@ -371,8 +377,7 @@ async def del_package_version(name: str, version: str):
     return { "ok" : True }
 
 
-
-@APP.get("/get_package/")
+@APP.get("/package/")
 async def get_package(name: str, lite: bool = False):
     """ Returns the package information, including URL for download """
     if CONFIG is None:
@@ -398,8 +403,8 @@ async def get_package(name: str, lite: bool = False):
 
     return {}
 
-@APP.get("/check_for_update/")
-async def check_for_update(name: str, node_id: str):
+@APP.get("/check_for_update/", status_code=status.HTTP_200_OK)
+async def check_for_update(name: str, node_id: str, response: Response):
     if CONFIG is None:
         do_config()
 
@@ -421,12 +426,14 @@ async def check_for_update(name: str, node_id: str):
                 "blob" : version_entry["blob_id"]
             }
 
-        return {"ok", False}
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return {"info": "No versions for package"}
 
-    return {}
+    response.status_code = status.HTTP_404_NOT_FOUND
+    return {"info": "Package not found"}
 
 
-@APP.get("/set_active_version/")
+@APP.put("/set_active_version/")
 async def set_active_version(name: str, version: str):
     """ Set the active version via the API """
     if CONFIG is None:
@@ -456,8 +463,8 @@ async def set_active_version(name: str, version: str):
         return {"ok": True}
     return {"ok": False}
 
-@APP.get("/get_blob/")
-async def get_blob(name: str, blob: str):
+@APP.get("/blob/")
+async def blob(name: str, blob: str):
     """ Set a blob file """
     if CONFIG is None:
         do_config()

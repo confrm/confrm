@@ -90,7 +90,8 @@ document.addEventListener("DOMContentLoaded", function () {
     $("#packages-table-title").html(meta["packages_installed"] + " Packages Installed");
 
     let data = $.ajax({
-      url: "/packages/"
+      url: "/packages/",
+      type: "GET"
     }).then(function (data) {
 
       let html = "";
@@ -161,7 +162,8 @@ document.addEventListener("DOMContentLoaded", function () {
         $("#modal-package-upload .modal-title").html(title);
         // Get up to date information for the UI
         let data = $.ajax({
-          url: "/get_package/?name=" + name
+          url: "/package/?name=" + name,
+          type: "GET"
         }).then(function (data) {
           let html = '';
           html += "Version Number (Active version is " + data.current_version;
@@ -225,7 +227,7 @@ document.addEventListener("DOMContentLoaded", function () {
         var fd = new FormData();
         fd.append('file', $("#package-upload-file")[0].files[0]);
 
-        let url = "/add_package_version/?" +
+        let url = "/package_version/?" +
           "name=" + active_package +
           "&major=" + major +
           "&minor=" + minor +
@@ -240,7 +242,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }).done(function (data) {
           $("[data-bs-dismiss=modal]").trigger({ type: "click" });
           if (data.ok === true) {
-            ...
+            //...
           }
 // Action deployment method
 // Show alert above main table if there was any error...
@@ -254,7 +256,8 @@ document.addEventListener("DOMContentLoaded", function () {
         if ("canary" === selection) {
 
           let data = $.ajax({
-            url: "/get_nodes/?package=" + active_package
+            url: "/nodes/?package=" + active_package,
+            type: "GET"
           }).then(function (data) {
 
             let html = '';
@@ -337,7 +340,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function setPackageVersionsModal(name) {
     let data = $.ajax({
-      url: "/get_package/?name=" + name
+      url: "/package/?name=" + name,
+      type: "GET"
     }).then(function (data) {
       let title = data["title"];
       let body = `
@@ -367,9 +371,9 @@ document.addEventListener("DOMContentLoaded", function () {
             <span class="dropdown">
               <button class="btn dropdown-toggle align-text-top" data-bs-boundary="viewport"
                 data-bs-toggle="dropdown">Actions</button>
-              <div class="dropdown-menu dropdown-menu-end packages-delete-version" data-version="` + number + `" 
-              data-package-name="` + name + `" style="cursor:pointer">
-                <div class="dropdown-item" href="#">
+              <div class="dropdown-menu dropdown-menu-end style="cursor:pointer">
+                <div class="dropdown-item packages-delete-version" data-version="` + number + `" 
+                data-package-name="` + name + `">
                   Delete Version
                 </div>
         `;
@@ -400,7 +404,8 @@ document.addEventListener("DOMContentLoaded", function () {
         let package = sender.currentTarget.dataset.packageName;
         let version = sender.currentTarget.dataset.version;
         let data = $.ajax({
-          url: "/set_active_version/?name=" + name + "&version=" + version
+          url: "/set_active_version/?name=" + name + "&version=" + version,
+          type: "PUT"
         }).then(function (data) {
           setPackageVersionsModal(name);
         });
@@ -411,7 +416,8 @@ document.addEventListener("DOMContentLoaded", function () {
         let package = sender.currentTarget.dataset.packageName;
         let version = sender.currentTarget.dataset.version;
         let data = $.ajax({
-          url: "/del_package_version/?name=" + name + "&version=" + version
+          url: "/package_version/?name=" + name + "&version=" + version,
+          type: "DELETE"
         }).then(function (data) {
           setPackageVersionsModal(name);
         });
@@ -422,7 +428,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function updateMeta(meta) {
     let data = $.ajax({
-      url: "/info/"
+      url: "/info/",
+      type: "GET"
     }).then((function (data) {
       for (let key in data) {
         meta[key] = data[key];
