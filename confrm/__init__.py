@@ -1,1 +1,0 @@
-from .confrm import APP

@@ -42,7 +42,7 @@ logger.setLevel(logging.INFO)
 # to FastAPI will fail
 
 
-class Package(BaseModel): #pylint: disable=R0903
+class Package(BaseModel):  # pylint: disable=R0903
     """Definition of a package"""
     name: str
     title: str
@@ -50,7 +50,7 @@ class Package(BaseModel): #pylint: disable=R0903
     platform: str
 
 
-class PackageVersion(BaseModel): #pylint: disable=R0903
+class PackageVersion(BaseModel):  # pylint: disable=R0903
     """Definition of a package version"""
     name: str
     major: int
@@ -67,7 +67,7 @@ def do_config():
     """Gets the config based on an environment variable and sets up global
     objects as required """
 
-    global CONFIG, DB # pylint: disable=W0603
+    global CONFIG, DB  # pylint: disable=W0603
 
     if "CONFRM_CONFIG" not in os.environ.keys():
         msg = "CONFRM_CONFIG not set in os.environ"
@@ -111,7 +111,7 @@ def get_package_versions(name: str, package: {} = None):
     for entry in versions_raw:
         version_str = f'{entry["major"]}.{entry["minor"]}.{entry["revision"]}'
         if "current_version" in package.keys() and \
-            version_str == package["current_version"]:
+                version_str == package["current_version"]:
             current_version = {
                 "number": version_str,
                 "date": entry["date"],
@@ -124,9 +124,10 @@ def get_package_versions(name: str, package: {} = None):
                 "blob": entry["blob_id"]
             })
             versions = sorted(
-                    versions,
-                    key=lambda x: [int(i) if i.isdigit() else i for i in x["number"].split('.')],
-                    reverse = True
+                versions,
+                key=lambda x: [int(i) if i.isdigit()
+                               else i for i in x["number"].split('.')],
+                reverse=True
             )
 
     if current_version is not None:
@@ -168,17 +169,16 @@ def format_package_info(package: dict, lite: bool = False):
         "platform": package["platform"],
         "current_version": current_version,
         "latest_version": latest_version,
-        "versions" : versions
+        "versions": versions
     }
 
 
 # Files server in /static will point to ./dashboard (with respect to the running
 # script)
 APP.mount("/static",
-        StaticFiles(directory=
-                        os.path.join(os.path.dirname(__file__), "dashboard")
-                   ),
-        name="home")
+          StaticFiles(directory=os.path.join(os.path.dirname(__file__), "dashboard")
+                      ),
+          name="home")
 
 
 @APP.on_event("startup")
@@ -193,7 +193,7 @@ async def index():
     """Returns index page for UI"""
     return FileResponse(
         os.path.join(os.path.dirname(__file__), "dashboard/index.html")
-            )
+    )
 
 
 @APP.get("/info/")
@@ -259,24 +259,24 @@ async def register_node(
     node_entry = nodes.get(query.node_id == node_id)
     if node_entry is None:
         entry = {
-                "node_id": node_id,
-                "package": package,
-                "version": version,
-                "description": description,
-                "platform": platform,
-                "last_updated": -1,
-                "last_seen": round(time.time())
+            "node_id": node_id,
+            "package": package,
+            "version": version,
+            "description": description,
+            "platform": platform,
+            "last_updated": -1,
+            "last_seen": round(time.time())
         }
         nodes.insert(entry)
         return {}
 
     # Update the package entry based on package name change, new version of a package
     # and register this as the last update time
-    if node_entry["package"] != package: # Package changed
+    if node_entry["package"] != package:  # Package changed
         node_entry["package"] = package
         node_entry["version"] = version
         node_entry["last_updated"] = -1
-    elif node_entry["version"] != version: # Version of package changed
+    elif node_entry["version"] != version:  # Version of package changed
         node_entry["version"] = version
         node_entry["last_updated"] = round(time.time())
     node_entry["last_seen"] = round(time.time())
@@ -337,7 +337,7 @@ async def put_package(response: Response, package: Package = Depends()):
 
     # Escape the strings
     for key in package_dict.keys():
-        if str == type(package_dict[key]):
+        if isinstance(package_dict[key], str):
             package_dict[key] = escape(package_dict[key])
 
     packages = DB.table("packages")
@@ -411,8 +411,8 @@ async def add_package_version(
 
     if set_active is True:
         version = str(package_version_dict["major"]) + "." + \
-                  str(package_version_dict["minor"]) + "." + \
-                  str(package_version_dict["revision"])
+            str(package_version_dict["minor"]) + "." + \
+            str(package_version_dict["revision"])
         package["current_version"] = version
         packages.update(package, query.name == package["name"])
 
@@ -432,12 +432,12 @@ async def del_package_version(name: str, version: str):
     if package is not None:
         if "current_version" in package.keys():
             if version == package["current_version"]:
-                return { "ok": False }
+                return {"ok": False}
 
     package_versions = DB.table("package_versions")
     parts = version.split(".")
     version_entry = package_versions.get(
-            (query.name == name) &
+        (query.name == name) &
         (query.major == int(parts[0])) &
         (query.minor == int(parts[1])) &
         (query.revision == int(parts[2])))
@@ -445,8 +445,9 @@ async def del_package_version(name: str, version: str):
     if version_entry is None:
         return {"ok": False}
 
-    package_versions.remove(doc_ids = [version_entry.doc_id])
-    file_path = os.path.join(CONFIG["storage"]["data_dir"], version_entry["blob_id"])
+    package_versions.remove(doc_ids=[version_entry.doc_id])
+    file_path = os.path.join(
+        CONFIG["storage"]["data_dir"], version_entry["blob_id"])
     os.remove(file_path)
 
     return {"ok": True}
@@ -516,10 +517,10 @@ async def check_for_update(name: str, node_id: str, response: Response):
                 if node["canary"]["package"] == name:
                     parts = node["canary"]["version"]
                     version_entry = package_versions.get(
-                            (query.name == name) &
-                            (query.major == int(parts[0])) &
-                            (query.minor == int(parts[1])) &
-                            (query.revision == int(parts[2])))
+                        (query.name == name) &
+                        (query.major == int(parts[0])) &
+                        (query.minor == int(parts[1])) &
+                        (query.revision == int(parts[2])))
                 return {
                     "current_version": package["current_version"],
                     "blob": version_entry["blob_id"]
@@ -528,10 +529,10 @@ async def check_for_update(name: str, node_id: str, response: Response):
         if "current_version" in package.keys():
             parts = package["current_version"].split(".")
             version_entry = package_versions.get(
-                    (query.name == name) &
-                    (query.major == int(parts[0])) &
-                    (query.minor == int(parts[1])) &
-                    (query.revision == int(parts[2])))
+                (query.name == name) &
+                (query.major == int(parts[0])) &
+                (query.minor == int(parts[1])) &
+                (query.revision == int(parts[2])))
             return {
                 "current_version": package["current_version"],
                 "blob": version_entry["blob_id"]
@@ -539,7 +540,6 @@ async def check_for_update(name: str, node_id: str, response: Response):
 
         response.status_code = status.HTTP_404_NOT_FOUND
         response.message = "No versions found for package"
-
 
     response.status_code = status.HTTP_404_NOT_FOUND
     response.message = "Package not found"
@@ -561,10 +561,10 @@ async def set_active_version(name: str, version: str):
 
     parts = version.split(".")
     version_entry = package_versions.search(
-            (query.name == name) &
-            (query.major == int(parts[0])) &
-            (query.minor == int(parts[1])) &
-            (query.revision == int(parts[2])))
+        (query.name == name) &
+        (query.major == int(parts[0])) &
+        (query.minor == int(parts[1])) &
+        (query.revision == int(parts[2])))
     if len(version_entry) < 1:
         return {"ok": False, "info": "Specified version does not exist for package"}
 
@@ -591,8 +591,8 @@ async def get_blob(name: str, blob: str):
         return {"ok": False, "info": "Package does not exist"}
 
     version_entry = package_versions.get(
-            query.name == name and
-            query.blob_id == blob)
+        query.name == name and
+        query.blob_id == blob)
     if version_entry is None:
         return {"ok": False, "info": "Specified blob does not exist for package"}
 

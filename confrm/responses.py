@@ -18,13 +18,14 @@ limitations under the License.
 from fastapi.responses import Response
 from starlette.types import Receive, Scope, Send
 
+
 class ConfrmFileResponse(Response):
     """Response class to enable files to be transfered from memory
-
-    Builds on the FileResponse class in starlette.types.
+    This builds on the FileResponse class in starlette.types.
     """
 
     chunk_size = 4096
+
 
     def __init__(self, data: bytes = None) -> None: #pylint: disable=W0231
         """Init method for ConfrmFileResponse class """
@@ -34,6 +35,7 @@ class ConfrmFileResponse(Response):
         self.init_headers(None)
         self.background = None
         self._headers_set = False
+
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Call method, overrides default method in FileResponse
@@ -46,13 +48,11 @@ class ConfrmFileResponse(Response):
             self._headers_set = True
             content_length = str(len(self.data))
             self.headers.setdefault("content-length", content_length)
-            await send(
-                {
+            await send({
                     "type": "http.response.start",
                     "status": 200,
                     "headers": self.raw_headers,
-                }
-        )
+                })
 
         more_body = True
         while more_body:

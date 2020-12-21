@@ -34,6 +34,7 @@ def test_incorrect_env():
             client = TestClient(APP)
             _ = client.get("/time/")
 
+
 def test_wrong_config():
     # Requires refactor of create_test_folder to take alternative data_dir...
     pass
@@ -94,10 +95,10 @@ def test_put_package():
         with TestClient(APP) as client:
 
             response = client.put("/package/" +
-                "?name=test_package" +
-                "&description=some%20description" +
-                "&title=Good%20Name" +
-                "&platform=esp32")
+                                  "?name=test_package" +
+                                  "&description=some%20description" +
+                                  "&title=Good%20Name" +
+                                  "&platform=esp32")
             assert response.status_code == 201
 
             response = client.get("/package/?name=test_package")
@@ -110,18 +111,18 @@ def test_put_package():
             assert data["platform"] == "esp32"
 
             response = client.put("/package/" +
-                "?name=test_package" +
-                "&description=some%20description" +
-                "&title=Good%20Name" +
-                "&platform=esp32")
+                                  "?name=test_package" +
+                                  "&description=some%20description" +
+                                  "&title=Good%20Name" +
+                                  "&platform=esp32")
             assert response.status_code == 400
 
             # Check that input is escaped
             response = client.put("/package/" +
-                "?name=test_package2" +
-                "&description=<b>some%20description</b>" +
-                "&title=Good%20Name" +
-                "&platform=esp32")
+                                  "?name=test_package2" +
+                                  "&description=<b>some%20description</b>" +
+                                  "&title=Good%20Name" +
+                                  "&platform=esp32")
             assert response.status_code == 201
 
             response = client.get("/package/?name=test_package2")
