@@ -30,7 +30,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from tinydb import TinyDB, Query
 from markupsafe import escape
-from pydantic import BaseModel # pylint: disable=E0611
+from pydantic import BaseModel  # pylint: disable=E0611
 
 from confrm.responses import ConfrmFileResponse
 
@@ -41,12 +41,14 @@ logger.setLevel(logging.INFO)
 # API calls, if the calls do not match these names and data-types then the call
 # to FastAPI will fail
 
+
 class Package(BaseModel): #pylint: disable=R0903
     """Definition of a package"""
     name: str
     title: str
     description: str
     platform: str
+
 
 class PackageVersion(BaseModel): #pylint: disable=R0903
     """Definition of a package version"""
@@ -55,9 +57,11 @@ class PackageVersion(BaseModel): #pylint: disable=R0903
     minor: int
     revision: int
 
+
 APP = FastAPI()
 CONFIG = None
 DB = None
+
 
 def do_config():
     """Gets the config based on an environment variable and sets up global
@@ -155,7 +159,7 @@ def format_package_info(package: dict, lite: bool = False):
 
     latest_version = current_version
     if len(versions) > 0:
-        latest_version = max(versions, key=lambda x:x["date"])["number"]
+        latest_version = max(versions, key=lambda x: x["date"])["number"]
 
     return {
        "title": package["title"],
@@ -169,11 +173,12 @@ def format_package_info(package: dict, lite: bool = False):
 
 # Files server in /static will point to ./dashboard (with respect to the running
 # script)
-APP.mount("/static", \
-        StaticFiles(directory= \
-        os.path.join(os.path.dirname(__file__), "dashboard") \
-            ), \
+APP.mount("/static",
+        StaticFiles(directory=
+            os.path.join(os.path.dirname(__file__), "dashboard")
+        ),
         name="home")
+
 
 @APP.on_event("startup")
 async def startup_event():
