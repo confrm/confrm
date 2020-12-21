@@ -215,26 +215,39 @@ async def get_time():
 
 
 @APP.put("/register_node/", status_code=status.HTTP_200_OK)
-async def register_node(node_id: str, package: str, version: str, response: Response):
+async def register_node(
+        node_id: str,
+        package: str,
+        version: str,
+        description: str,
+        platform: str,
+        response: Response):
     """Registers a node to the server
 
     Attributes:
         node_id (str): The node id, must be unique, MAC addresses work well
         package (str): Package installed on the node
         version (str): Version string of currently running package
+        description (str): Description of package
+        platform: (str): Platform type (i.e. esp32)
         response (Response): Starlette response object for setting return codes
 
     Returns:
         HTTP_200_OK / {} if registration successful
         HTTP_404_NOT_FOUND / {"info": msg} if not successful, information is msg
     """
-    if CONFIG is None:
-        do_config()
 
     packages = DB.table("packages")
     nodes = DB.table("nodes")
 
     query = Query()
+
+    # Make sure input is sane
+    node_id = escape(node_id)
+    package = escape(package)
+    version = escape(version)
+    description = escape(description)
+    platform = escape(description)
 
     package_entry = packages.get(query.name == package)
     if package_entry is None:
@@ -247,6 +260,8 @@ async def register_node(node_id: str, package: str, version: str, response: Resp
                 "node_id": node_id,
                 "package": package,
                 "version": version,
+                "description": description,
+                "platform": platform,
                 "last_updated": -1,
                 "last_seen": round(time.time())
         }
@@ -434,15 +449,49 @@ async def get_package(name: str, lite: bool = False):
 
 @APP.get("/check_for_update/", status_code=status.HTTP_200_OK)
 async def check_for_update(name: str, node_id: str, response: Response):
-    if CONFIG is None:
-        do_config()
+    """Called by node wanting to know if an update is available
+
+    Will return the most recent package version for the given package name.
+    Will check to see if a canary entry has been made for the node, if it has
+    and the canary package name is consistent then the canary version will be
+    returned.
+
+    Arguments:
+        name (str): Package to check for update for
+        node_id (str): Id of the node making the request, or empty
+        response (Response): Starlette response object for setting return codes
+    Returns:
+        HTTP_200_OK / {"current_version": ..., "blob": ...} if found
+        HTTP_404_NOT_FOUND / Message header / {}  if not found
+    """
 
     packages = DB.table("packages")
     package_versions = DB.table("package_versions")
+    nodes = DB.table("nodes")
+
     query = Query()
 
     package = packages.get(query.name == name)
     if package is not None:
+
+        # Check to see if there is a canary entry for this node
+        node = nodes.get(query.node_id == node_id)
+        if node is not None:
+            if "canary" in node.keys():
+                # Check to see if canary is the right package, if it isnt
+                # then return back to the normal flow
+                if node["canary"]["package"] == name:
+                    parts = node["canary"]["version"]
+                    version_entry = package_versions.get(
+                            (query.name == name) &
+                            (query.major == int(parts[0])) &
+                            (query.minor == int(parts[1])) &
+                            (query.revision == int(parts[2])))
+                return {
+                    "current_version": package["current_version"],
+                    "blob": version_entry["blob_id"]
+                }
+
         if "current_version" in package.keys():
             parts = package["current_version"].split(".")
             version_entry = package_versions.get(
@@ -455,11 +504,12 @@ async def check_for_update(name: str, node_id: str, response: Response):
                 "blob": version_entry["blob_id"]
             }
 
-            response.status_code = status.HTTP_404_NOT_FOUND
-        return {"info": "No versions for package"}
+        response.status_code = status.HTTP_404_NOT_FOUND
+        response.message = "No versions found for package"
+
 
     response.status_code = status.HTTP_404_NOT_FOUND
-    return {"info": "Package not found"}
+    response.message = "Package not found"
 
 
 @APP.put("/set_active_version/")
