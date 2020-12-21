@@ -197,8 +197,6 @@ async def index():
 @APP.get("/info/")
 async def info():
     """Get basic info for UI elements"""
-    if CONFIG is None:
-        do_config()
 
     ret = {}
     packages = DB.table('packages')
@@ -213,7 +211,7 @@ async def get_time():
     if CONFIG is None:
         do_config()
 
-    return { "time": round(time.time()) }
+    return {"time": round(time.time())}
 
 
 @APP.put("/register_node/", status_code=status.HTTP_200_OK)
@@ -309,15 +307,13 @@ async def package_list():
     return ui_packages
 
 
-@APP.post("/add_package/")
-async def add_package(package: Package = Depends()):
-    """Uploads a package with optional binary package
+@APP.put("/package/", status_code=status.HTTP_201_CREATED)
+async def put_package(response: Response, package: Package = Depends()):
+    """Add package description
 
     Attributes:
         package (Package): Package description to be added
     """
-    if CONFIG is None:
-        do_config()
 
     # Update storage record to include the local information
     package_dict = package.__dict__
@@ -332,11 +328,13 @@ async def add_package(package: Package = Depends()):
 
     existing_name = packages.get(query.name == package_dict["name"])
     if existing_name is not None:
-        return {"ok": False} # TODO: Return more useful error
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        response.message = "Package already exists"
+        return {}
 
     packages.insert(package_dict)
 
-    return {"ok": True}
+    return {}
 
 
 @APP.post("/package_version/")

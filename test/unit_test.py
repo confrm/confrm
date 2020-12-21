@@ -60,10 +60,20 @@ def test_get_info():
         os.environ["CONFRM_CONFIG"] = config_file
 
         client = TestClient(APP)
+
         response = client.get("/info/")
         assert response.status_code == 200
         assert "packages" in response.json().keys()
         assert int(response.json()["packages"]) == 0
+
+        response = client.put("/package/?name=test_package&description=some%20description&title=Good%20Name&platform=esp32")
+        assert response.status_code == 201
+        
+        response = client.get("/info/")
+        assert response.status_code == 200
+        assert "packages" in response.json().keys()
+        assert int(response.json()["packages"]) == 1
+
 
 # info
 # register_node
