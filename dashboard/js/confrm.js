@@ -87,7 +87,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     $("#page-content").html(templates["packages"]["packages.html"]);
 
-    $("#packages-table-title").html(meta["packages_installed"] + " Packages Installed");
+    $("#packages-table-title").html(meta["packages"] + " Packages Installed");
 
     let data = $.ajax({
       url: "/packages/",

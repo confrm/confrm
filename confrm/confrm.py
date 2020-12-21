@@ -70,12 +70,14 @@ def do_config():
         logging.error(msg)
         raise ValueError(msg)
 
-    if os.path.exists(os.environ["CONFRM_CONFIG"]) is False:
-        msg = "Config file does not exist"
+    config_file = os.environ["CONFRM_CONFIG"]
+
+    if os.path.isfile(config_file) is False:
+        msg = f"Config file {config_file} does not exist"
         logging.error(msg)
         raise ValueError(msg)
 
-    CONFIG = toml.load(os.environ["CONFRM_CONFIG"])
+    CONFIG = toml.load(config_file)
 
     # Create the database from the data store
     DB = TinyDB(os.path.join(CONFIG["storage"]["data_dir"], "confrm_db.json"))
@@ -189,7 +191,7 @@ async def info():
 
     ret = {}
     packages = DB.table('packages')
-    ret["packages_installed"] = len(packages)
+    ret["packages"] = len(packages)
 
     return ret
 
