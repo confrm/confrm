@@ -494,7 +494,7 @@ async def set_active_version(name: str, version: str):
 
 
 @APP.get("/blob/")
-async def blob(name: str, blob: str):
+async def get_blob(name: str, blob: str):
     """ Set a blob file """
     if CONFIG is None:
         do_config()
