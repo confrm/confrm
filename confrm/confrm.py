@@ -65,6 +65,16 @@ def do_config():
 
     global CONFIG, DB # pylint: disable=W0603
 
+    if "CONFRM_CONFIG" not in os.environ.keys():
+        msg = "CONFRM_CONFIG not set in os.environ"
+        logging.error(msg)
+        raise ValueError(msg)
+
+    if os.path.exists(os.environ["CONFRM_CONFIG"]) is False:
+        msg = "Config file does not exist"
+        logging.error(msg)
+        raise ValueError(msg)
+
     CONFIG = toml.load(os.environ["CONFRM_CONFIG"])
 
     # Create the database from the data store
@@ -158,6 +168,12 @@ def format_package_info(package: dict, lite: bool = False):
 # Files server in /static will point to ./dashboard (with respect to the running
 # script)
 APP.mount("/static", StaticFiles(directory="dashboard"), name="home")
+
+@APP.on_event("startup")
+async def startup_event():
+    """Is called on application startup"""
+    do_config()
+
 
 @APP.get("/")
 async def index():
