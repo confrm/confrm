@@ -29,6 +29,7 @@ setuptools.setup(
         "markupsafe",
         "pycryptodome",
         "python-multipart",
+        "requests",
         "tinydb",
         "toml",
         "uvicorn"],
