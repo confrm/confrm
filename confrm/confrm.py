@@ -162,12 +162,13 @@ def format_package_info(package: dict, lite: bool = False):
         latest_version = max(versions, key=lambda x: x["date"])["number"]
 
     return {
-       "title": package["title"],
-       "description": package["description"],
-       "platform": package["platform"],
-       "current_version": current_version,
-       "latest_version": latest_version,
-       "versions" : versions
+        "name": package["name"],
+        "title": package["title"],
+        "description": package["description"],
+        "platform": package["platform"],
+        "current_version": current_version,
+        "latest_version": latest_version,
+        "versions" : versions
     }
 
 
@@ -183,6 +184,7 @@ APP.mount("/static",
 @APP.on_event("startup")
 async def startup_event():
     """Is called on application startup"""
+
     do_config()
 
 
@@ -343,8 +345,10 @@ async def put_package(response: Response, package: Package = Depends()):
 
     existing_name = packages.get(query.name == package_dict["name"])
     if existing_name is not None:
+        msg = "Package already exists"
+        logging.info(msg)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        response.message = "Package already exists"
+        response.message = msg
         return {}
 
     packages.insert(package_dict)
@@ -448,8 +452,8 @@ async def del_package_version(name: str, version: str):
     return {"ok": True}
 
 
-@APP.get("/package/")
-async def get_package(name: str, lite: bool = False):
+@APP.get("/package/", status_code=status.HTTP_200_OK)
+async def get_package(name: str, response: Response, lite: bool = False):
     """ Returns the package information, including URL for download """
     if CONFIG is None:
         do_config()
@@ -472,6 +476,7 @@ async def get_package(name: str, lite: bool = False):
 
         return format_package_info(package, lite)
 
+    response.status_code = status.HTTP_404_NOT_FOUND
     return {}
 
 
