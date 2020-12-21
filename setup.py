@@ -27,7 +27,7 @@ setuptools.setup(
     install_requires=["aiofiles",
         "fastapi",
         "markupsafe",
-        "pycroptodome",
+        "pycryptodome",
         "python-multipart",
         "tinydb",
         "toml",
@@ -37,4 +37,6 @@ setuptools.setup(
                  "Natural Language :: English"
                  "Operating System :: OS Independent",
                  "Programming Language :: Python :: 3.6"],
-    keywords="IOT deploy")
+    keywords="IOT deploy",
+    include_package_data=True
+    )

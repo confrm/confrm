@@ -169,7 +169,11 @@ def format_package_info(package: dict, lite: bool = False):
 
 # Files server in /static will point to ./dashboard (with respect to the running
 # script)
-APP.mount("/static", StaticFiles(directory="dashboard"), name="home")
+APP.mount("/static", \
+        StaticFiles(directory= \
+        os.path.join(os.path.dirname(__file__), "dashboard") \
+            ), \
+        name="home")
 
 @APP.on_event("startup")
 async def startup_event():
@@ -180,7 +184,9 @@ async def startup_event():
 @APP.get("/")
 async def index():
     """Returns index page for UI"""
-    return FileResponse("dashboard/index.html")
+    return FileResponse(
+            os.path.join(os.path.dirname(__file__), "dashboard/index.html")
+            )
 
 
 @APP.get("/info/")
