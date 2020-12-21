@@ -175,8 +175,8 @@ def format_package_info(package: dict, lite: bool = False):
 # script)
 APP.mount("/static",
         StaticFiles(directory=
-            os.path.join(os.path.dirname(__file__), "dashboard")
-        ),
+                        os.path.join(os.path.dirname(__file__), "dashboard")
+                   ),
         name="home")
 
 
@@ -190,7 +190,7 @@ async def startup_event():
 async def index():
     """Returns index page for UI"""
     return FileResponse(
-            os.path.join(os.path.dirname(__file__), "dashboard/index.html")
+        os.path.join(os.path.dirname(__file__), "dashboard/index.html")
             )
 
 
@@ -338,6 +338,7 @@ async def add_package(package: Package = Depends()):
 
     return {"ok": True}
 
+
 @APP.post("/package_version/")
 async def add_package_version(package_version: PackageVersion = Depends(), file: bytes = File(...)):
     """ Uploads a package with optional binary package """
@@ -359,7 +360,7 @@ async def add_package_version(package_version: PackageVersion = Depends(), file:
 
     # Escape the strings
     for key in package_dict.keys():
-        if str == type(package_dict[key]):
+        if isinstance(package_dict[key], str):
             package_dict[key] = escape(package_dict[key])
 
     # Update with blob details
@@ -390,20 +391,20 @@ async def del_package_version(name: str, version: str):
 
     package_versions = DB.table("package_versions")
     parts = version.split(".")
-    version_entry = package_versions.get( \
-        (query.name == name) & \
-        (query.major == int(parts[0])) & \
-        (query.minor == int(parts[1])) & \
+    version_entry = package_versions.get(
+            (query.name == name) &
+        (query.major == int(parts[0])) &
+        (query.minor == int(parts[1])) &
         (query.revision == int(parts[2])))
 
     if version_entry is None:
-        return { "ok" : False }
+        return {"ok": False}
 
     package_versions.remove(doc_ids = [version_entry.doc_id])
     file_path = os.path.join(CONFIG["storage"]["data_dir"], version_entry["blob_id"])
     os.remove(file_path)
 
-    return { "ok" : True }
+    return {"ok": True}
 
 
 @APP.get("/package/")
@@ -417,20 +418,21 @@ async def get_package(name: str, lite: bool = False):
     package = packages.get(query.name == name)
     if package is not None:
         # Sign the binary hash with the current private key
-#        blob_hash = int.from_bytes(str.encode(package["blob_hash"]), byteorder="big")
-#        signature = hex(pow(blob_hash, privateKey.d, privateKey.n))
-#        package["signature"] = signature
-#        del package["blob"]
-#
-#        bytesig = bytes.fromhex(signature[2:])
-#        hashFromSig = pow(int.from_bytes(bytesig, byteorder='big'), privateKey.e, privateKey.n)
-#
-#        print(blob_hash)
-#        print(hashFromSig)
+        #        blob_hash = int.from_bytes(str.encode(package["blob_hash"]), byteorder="big")
+        #        signature = hex(pow(blob_hash, privateKey.d, privateKey.n))
+        #        package["signature"] = signature
+        #        del package["blob"]
+        #
+        #        bytesig = bytes.fromhex(signature[2:])
+        #        hashFromSig = pow(int.from_bytes(bytesig, byteorder='big'), privateKey.e, privateKey.n)
+        #
+        #        print(blob_hash)
+        #        print(hashFromSig)
 
         return format_package_info(package, lite)
 
     return {}
+
 
 @APP.get("/check_for_update/", status_code=status.HTTP_200_OK)
 async def check_for_update(name: str, node_id: str, response: Response):
@@ -445,17 +447,17 @@ async def check_for_update(name: str, node_id: str, response: Response):
     if package is not None:
         if "current_version" in package.keys():
             parts = package["current_version"].split(".")
-            version_entry = package_versions.get( \
-                    (query.name == name) & \
-                    (query.major == int(parts[0])) & \
-                    (query.minor == int(parts[1])) & \
+            version_entry = package_versions.get(
+                    (query.name == name) &
+                    (query.major == int(parts[0])) &
+                    (query.minor == int(parts[1])) &
                     (query.revision == int(parts[2])))
             return {
                 "current_version": package["current_version"],
-                "blob" : version_entry["blob_id"]
+                "blob": version_entry["blob_id"]
             }
 
-        response.status_code = status.HTTP_404_NOT_FOUND
+            response.status_code = status.HTTP_404_NOT_FOUND
         return {"info": "No versions for package"}
 
     response.status_code = status.HTTP_404_NOT_FOUND
@@ -474,14 +476,14 @@ async def set_active_version(name: str, version: str):
 
     package_entry = packages.get(query.name == name)
     if package_entry is None:
-        return {"ok" : False, "info": "Package does not exist"}
+        return {"ok": False, "info": "Package does not exist"}
 
     parts = version.split(".")
-    version_entry = package_versions.search( \
-            (query.name == name) & \
-            (query.major == int(parts[0])) & \
-            (query.minor == int(parts[1])) & \
-            (query.revision == int(parts[2]) ))
+    version_entry = package_versions.search(
+            (query.name == name) &
+            (query.major == int(parts[0])) &
+            (query.minor == int(parts[1])) &
+            (query.revision == int(parts[2])))
     if len(version_entry) < 1:
         return {"ok": False, "info": "Specified version does not exist for package"}
 
@@ -491,6 +493,7 @@ async def set_active_version(name: str, version: str):
     if len(result) > 0:
         return {"ok": True}
     return {"ok": False}
+
 
 @APP.get("/blob/")
 async def blob(name: str, blob: str):
@@ -504,10 +507,10 @@ async def blob(name: str, blob: str):
 
     package_entry = packages.get(query.name == name)
     if package_entry is None:
-        return {"ok" : False, "info": "Package does not exist"}
+        return {"ok": False, "info": "Package does not exist"}
 
-    version_entry = package_versions.get( \
-            query.name == name and \
+    version_entry = package_versions.get(
+            query.name == name and
             query.blob_id == blob)
     if version_entry is None:
         return {"ok": False, "info": "Specified blob does not exist for package"}
