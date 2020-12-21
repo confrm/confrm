@@ -352,11 +352,34 @@ async def put_package(response: Response, package: Package = Depends()):
     return {}
 
 
-@APP.post("/package_version/")
-async def add_package_version(package_version: PackageVersion = Depends(), file: bytes = File(...)):
-    """ Uploads a package with optional binary package """
-    if CONFIG is None:
-        do_config()
+@APP.post("/package_version/", status_code=status.HTTP_201_CREATED)
+async def add_package_version(
+        response: Response,
+        package_version: PackageVersion = Depends(),
+        set_active: bool = False,
+        file: bytes = File(...)):
+    """Uploads a package verion with binary package
+
+    Arguments:
+        response (Response): Starlette response object for setting return codes
+        package_version (PackageVersion): Package description
+        set_active (bool): Default False, if true this version will be set active
+        file (bytes): File uploaded
+    Returns:
+        HTTP_201_CREATED if successful
+        HTTP_404_NOT_FOUNT if package is not found
+    """
+
+    package_version_dict = package_version.__dict__
+
+    packages = DB.table("packages")
+    query = Query()
+
+    package = packages.get(query.name == package_version_dict["name"])
+    if package is None:
+        response.status_code = status.HTTP_404_NOT_FOUND
+        response.message = "Package not found"
+        return {}
 
     # Package was uploaded, create hash of binary
     _h = SHA256.new()
@@ -368,24 +391,29 @@ async def add_package_version(package_version: PackageVersion = Depends(), file:
     with open(save_file, "wb") as ptr:
         ptr.write(base64.b64encode(file))
 
-    # Update storage record to include the local information
-    package_dict = package_version.__dict__
-
     # Escape the strings
-    for key in package_dict.keys():
-        if isinstance(package_dict[key], str):
-            package_dict[key] = escape(package_dict[key])
+    for key in package_version_dict.keys():
+        if isinstance(package_version_dict[key], str):
+            package_version_dict[key] = escape(package_version_dict[key])
 
     # Update with blob details
-    package_dict["date"] = round(time.time())
-    package_dict["hash"] = _h.hexdigest()
-    package_dict["blob_id"] = filename
+    package_version_dict["date"] = round(time.time())
+    package_version_dict["hash"] = _h.hexdigest()
+    package_version_dict["blob_id"] = filename
 
     # Store in the database
-    packages = DB.table("package_versions")
-    packages.insert(package_dict)
+    package_versions = DB.table("package_versions")
+    package_versions.insert(package_version_dict)
 
-    return {"ok": True}
+    if set_active is True:
+        version = str(package_version_dict["major"]) + "." + \
+                  str(package_version_dict["minor"]) + "." + \
+                  str(package_version_dict["revision"])
+        package["current_version"] = version
+        packages.update(package, query.name == package["name"])
+
+    return {}
+
 
 @APP.delete("/package_version/")
 async def del_package_version(name: str, version: str):

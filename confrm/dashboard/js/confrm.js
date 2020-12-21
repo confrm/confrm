@@ -233,6 +233,12 @@ document.addEventListener("DOMContentLoaded", function () {
           "&minor=" + minor +
           "&revision=" + revision;
 
+        if ("immediate" === $(".package-deployment-select")[0].value) {
+          url += "&set_active=true";
+        } else {
+          url += "&set_active=false";
+        }
+
         $.ajax({
           url: url,
           type: "POST",
