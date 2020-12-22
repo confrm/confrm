@@ -385,7 +385,7 @@ async def add_package_version(
         package_version: PackageVersion = Depends(),
         set_active: bool = False,
         file: bytes = File(...)):
-    """Uploads a package verion with binary package
+    """Uploads a package version with binary package
 
     Arguments:
         response (Response): Starlette response object for setting return codes
@@ -400,13 +400,36 @@ async def add_package_version(
     package_version_dict = package_version.__dict__
 
     packages = DB.table("packages")
+    package_versions = DB.table("package_versions")
     query = Query()
 
     package = packages.get(query.name == package_version_dict["name"])
     if package is None:
+        msg = "Package not found"
+        logging.info(msg)
         response.status_code = status.HTTP_404_NOT_FOUND
-        response.message = "Package not found"
-        return {}
+        return {
+            "error": "confrm-005",
+            "message": msg,
+            "detail": "While attempting to add a new package version the package name" +
+            " given was not found"
+        }
+
+    existing_version = package_versions.get((query.name == package_version_dict["name"]) &
+                                            (query.major == package_version_dict["major"]) &
+                                            (query.minor == package_version_dict["minor"]) &
+                                            (query.revision == package_version_dict["revision"]))
+
+    if existing_version is not None:
+        msg = "Version already exists for package"
+        logging.info(msg)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {
+            "error": "confrm-006",
+            "message": msg,
+            "detail": "While attempting to add a new package version the version given " +
+            " was found to be already used"
+        }
 
     # Package was uploaded, create hash of binary
     _h = SHA256.new()
@@ -429,7 +452,6 @@ async def add_package_version(
     package_version_dict["blob_id"] = filename
 
     # Store in the database
-    package_versions = DB.table("package_versions")
     package_versions.insert(package_version_dict)
 
     if set_active is True:

@@ -169,11 +169,15 @@ document.addEventListener("DOMContentLoaded", function () {
           type: "GET"
         }).then(function (data) {
           let html = '';
-          html += "Version Number (Active version is " + data.current_version;
-          if (data.current_version != data.latest_version) {
-            html += ", latest version is " + data.latest_version;
+          if ("" !== data.current_version) {
+            html += "Version Number (Active version is " + data.current_version;
+            if (data.latest_version !== "" && data.current_version != data.latest_version) {
+              html += ", latest version is " + data.latest_version;
+            }
+            html += ")";
+          } else {
+            html += "No versions currently exist for this package"
           }
-          html += ")";
           $('.modal-package-version-info').html(html);
         });
 
@@ -248,14 +252,18 @@ document.addEventListener("DOMContentLoaded", function () {
           data: fd,
           processData: false,  // tell jQuery not to process the data
           contentType: false   // tell jQuery not to set contentType
-        }).done(function (data) {
+        }).fail(function (jqXHR, textStatus, errorThrown) {
+          let json = jqXHR.responseJSON;
+          addAlert(json.message, json.detail, false);
+          $(".package-add-submit").unbind("click");
           $("[data-bs-dismiss=modal]").trigger({ type: "click" });
-          if (data.ok === true) {
-            //...
-          }
-// Action deployment method
-// Show alert above main table if there was any error...
+        }).done(function (data, textStatus, jqXHR) {
+          $(".package-add-submit").unbind("click");
+          $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+          updateMeta(meta);
+          showPage("packages");
         });
+
         return false;
       });
 
