@@ -13,7 +13,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     {
       "name": "Nodes",
-      "icon": "gg-smartphone-ram"
+      "icon": "gg-smartphone-ram",
+      "templates": ["nodes.html"]
     },
     {
       "name": "Keys",
@@ -432,6 +433,15 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
+
+  pages.push(drawHelper("nodes", () => {
+
+    $("#page-content").html(templates["nodes"]["nodes.html"]);
+  
+    $("#node-table-title").html(meta["nodes"] + " Nodes Registerd");
+  
+  }));
+
   function updateMeta(meta) {
     let data = $.ajax({
       url: "/info/",
@@ -444,3 +454,4 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
 });
+

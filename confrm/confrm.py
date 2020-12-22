@@ -201,8 +201,12 @@ async def info():
     """Get basic info for UI elements"""
 
     ret = {}
-    packages = DB.table('packages')
+
+    packages = DB.table("packages")
     ret["packages"] = len(packages)
+
+    nodes = DB.table("nodes")
+    ret["nodes"] = len(nodes) 
 
     return ret
 
