@@ -291,7 +291,7 @@ async def register_node(
 
 
 @APP.get("/nodes/", status_code=status.HTTP_200_OK)
-async def get_nodes(response: Response, package: str = ""):
+async def get_nodes(package: str = ""):
     """Returns a list of nodes using a given package
 
     Attributes:
@@ -345,6 +345,19 @@ async def put_package(response: Response, package: Package = Depends()):
     for key in package_dict.keys():
         if isinstance(package_dict[key], str):
             package_dict[key] = escape(package_dict[key])
+
+    if not package.name:
+        msg = "Package name cannot be empty"
+        logging.info(msg)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {
+            "error": "confrm-004",
+            "message": msg,
+            "detail": "While attempting to add a new package the package name was to to \"\""
+        }
+
+    if not package.title:
+        package.title = package.name
 
     packages = DB.table("packages")
     query = Query()

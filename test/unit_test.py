@@ -1,6 +1,8 @@
+"""Unit tests for confrm API"""
+
 import os
-import pytest
 import tempfile
+import pytest
 
 from fastapi.testclient import TestClient
 
@@ -35,9 +37,9 @@ def test_incorrect_env():
             _ = client.get("/time/")
 
 
-def test_wrong_config():
-    # Requires refactor of create_test_folder to take alternative data_dir...
-    pass
+#def test_wrong_config():
+#    # Requires refactor of create_test_folder to take alternative data_dir...
+#    pass
 
 
 def test_get_time():
@@ -71,10 +73,10 @@ def test_get_info():
             assert int(response.json()["packages"]) == 0
 
             response = client.put("/package/" +
-                "?name=test_package" +
-                "&description=some%20description" +
-                "&title=Good%20Name" +
-                "&platform=esp32")
+                                  "?name=test_package" +
+                                  "&description=some%20description" +
+                                  "&title=Good%20Name" +
+                                  "&platform=esp32")
             assert response.status_code == 201
 
             response = client.get("/info/")
@@ -101,6 +103,7 @@ def test_put_package():
                                   "&platform=esp32")
             assert response.status_code == 201
 
+            # Test the package was stored correctly
             response = client.get("/package/?name=test_package")
             assert response.status_code == 200
             data = response.json()
@@ -110,12 +113,14 @@ def test_put_package():
             assert data["title"] == "Good Name"
             assert data["platform"] == "esp32"
 
+            # Check duplicates are rejected
             response = client.put("/package/" +
                                   "?name=test_package" +
                                   "&description=some%20description" +
                                   "&title=Good%20Name" +
                                   "&platform=esp32")
             assert response.status_code == 400
+            assert response.json()["error"] == "confrm-003"
 
             # Check that input is escaped
             response = client.put("/package/" +
@@ -128,6 +133,27 @@ def test_put_package():
             response = client.get("/package/?name=test_package2")
             assert response.status_code == 200
             assert response.json()["description"].startswith("&lt;b&gt;")
+
+            # Check empty name is rejected
+            response = client.put("/package/" +
+                                  "?name=" +
+                                  "&description=<b>some%20description</b>" +
+                                  "&title=Good%20Name" +
+                                  "&platform=esp32")
+            assert response.status_code == 400
+            assert response.json()["error"] == "confrm-004"
+
+            # Check empty title is replaced with name
+            response = client.put("/package/" +
+                                  "?name=good_name" +
+                                  "&description=<b>some%20description</b>" +
+                                  "&title=" +
+                                  "&platform=esp32")
+            assert response.status_code == 201
+            response = client.get("/package/?name=good_name")
+            assert response.status_code == 200
+            assert response.json()["title"] == "good_name"
+            
 
 
 # register_node

@@ -25,6 +25,9 @@ document.addEventListener("DOMContentLoaded", function () {
   // For storing draw methods
   let pages = [];
 
+  // For page tracking
+  let current_page = nav_elements[0].name;
+
   // For storing templates
   let templates = [];
 
@@ -72,12 +75,10 @@ document.addEventListener("DOMContentLoaded", function () {
   html += '</ul>';
   $("#navbar-menu").html(html);
   $(".nav-link").click(function (e) {
+    let page_name = e.currentTarget.dataset["page"];
+    current_page = page_name;
     updateMeta(meta);
-    for (let page in pages) {
-      if (pages[page].name == e.currentTarget.dataset['page']) {
-        pages[page]();
-      }
-    }
+    showPage(page_name);
   });
 
   function drawHelper(name, body) {
@@ -100,8 +101,9 @@ document.addEventListener("DOMContentLoaded", function () {
       for (let entry in data) {
         let row = data[entry];
         // Version is a list, process to first element + info mark
-        let version = "";
+        let version = "", manage_versions = "";
         if (row["versions"].length == 0) {
+          manage_versions = "disabled";
           version = "None";
         } else if (row["versions"].length == 1) {
           version = row["versions"][0].number;
@@ -129,7 +131,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   data-package-title="` + row.title + `" data-bs-backdrop="static" data-bs-keyboard="false">
                   Upload new version
                 </div>
-                <div class="dropdown-item packages-info-button" style="cursor:pointer" 
+                <div class="dropdown-item packages-info-button ` + manage_versions +`" style="cursor:pointer;" 
                   data-bs-toggle="modal" data-bs-target="#modal-package-info" data-package-name="` + entry + `">
                   Manage versions
                 </div>
@@ -138,7 +140,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 </div>
               </div>
             </span>
-          </td>`;
+          </td>`;8
         html += "</tr>";
       }
 
@@ -376,15 +378,17 @@ document.addEventListener("DOMContentLoaded", function () {
         let data = $.ajax({
           url: url,
           type: "PUT"
-        }).always(function (jqXHR, textStatus, errorThrown) {
+        }).fail(function (jqXHR, textStatus, errorThrown) {
           let json = jqXHR.responseJSON;
-          if (201 !== textStatus) {
-            addAlert(json.message, json.detail, false);
-          }
+          addAlert(json.message, json.detail, false);
+          $(".package-add-submit").unbind("click");
           $("[data-bs-dismiss=modal]").trigger({ type: "click" });
-        })
-
-
+        }).done(function (data, textStatus, jqXHR) {
+          $(".package-add-submit").unbind("click");
+          $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+          updateMeta(meta);
+          showPage("packages");
+        });
 
       });
 
@@ -556,7 +560,7 @@ document.addEventListener("DOMContentLoaded", function () {
       <h3 class="mb-1">` + message + `</h3>
       <p>` + detail + `</p>
       <div class="btn-list">
-        <a href="#" class="btn btn-success">Okay</a>
+        <a href="#" class="btn btn-success" data-bs-dismiss="alert">Okay</a>
       </div>
       <a class="btn-close" data-bs-dismiss="alert" aria-label="close"></a>
       </div>
@@ -576,7 +580,18 @@ document.addEventListener("DOMContentLoaded", function () {
       for (let key in data) {
         meta[key] = data[key];
       }
+      if ("packages" === current_page) {
+        $("#packages-table-title").html(meta["packages"] + " Packages Installed");
+      }
     }).bind(meta));
+  }
+
+  function showPage(name) {
+    for (let page in pages) {
+      if (pages[page].name === name) {
+        pages[page]();
+      }
+    }
   }
 
 });
