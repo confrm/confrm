@@ -206,7 +206,7 @@ async def info():
     ret["packages"] = len(packages)
 
     nodes = DB.table("nodes")
-    ret["nodes"] = len(nodes) 
+    ret["nodes"] = len(nodes)
 
     return ret
 
@@ -354,8 +354,12 @@ async def put_package(response: Response, package: Package = Depends()):
         msg = "Package already exists"
         logging.info(msg)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        response.message = msg
-        return {}
+        return {
+            "error": "confrm-003",
+            "message": msg,
+            "detail": "While attempting to add a new package to the database a package with this " +
+            "name was found to already exist"
+        }
 
     packages.insert(package_dict)
 
@@ -545,10 +549,19 @@ async def check_for_update(name: str, node_id: str, response: Response):
             }
 
         response.status_code = status.HTTP_404_NOT_FOUND
-        response.message = "No versions found for package"
+        return {
+            "error": "confrm-001",
+            "message": "No versions found for package",
+            "detail": "While checking for updates the package was found in the database, " +
+            "however there are no available versions of that package"
+        }
 
     response.status_code = status.HTTP_404_NOT_FOUND
-    response.message = "Package not found"
+    return {
+        "error": "confrm-002",
+        "message": "Package not found",
+        "detail": "While checking for updates the package was not found in the database."
+    }
 
 
 @APP.put("/set_active_version/")

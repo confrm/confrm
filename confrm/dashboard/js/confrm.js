@@ -75,7 +75,7 @@ document.addEventListener("DOMContentLoaded", function () {
     updateMeta(meta);
     for (let page in pages) {
       if (pages[page].name == e.currentTarget.dataset['page']) {
-        console.log(pages[page]());
+        pages[page]();
       }
     }
   });
@@ -341,6 +341,53 @@ document.addEventListener("DOMContentLoaded", function () {
 
       });
 
+      $(".package-add-submit").unbind("click");
+      $(".package-add-submit").click(function () {
+        let elements = $("#modal-package-add").find("input");
+        
+        let name = "", title = "", description = "", platform = "";
+
+        for (let element in elements) {
+          let value = encodeURI(elements[element].value);
+          switch (elements[element].name) {
+            case "name":
+              name = value;
+              break;
+            case "title":
+              title = value;
+              break;
+            case "description":
+              description = value;
+              break;
+            case "platform":
+              platform = value;
+              break;
+            default:
+              break;
+          }
+        }
+
+        let url = "/package/";
+        url += "?name=" + name;
+        url += "&title=" + title;
+        url += "&description=" + description;
+        url += "&platform=" + platform;
+
+        let data = $.ajax({
+          url: url,
+          type: "PUT"
+        }).always(function (jqXHR, textStatus, errorThrown) {
+          let json = jqXHR.responseJSON;
+          if (201 !== textStatus) {
+            addAlert(json.message, json.detail, false);
+          }
+          $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+        })
+
+
+
+      });
+
     });
 
   }));
@@ -451,7 +498,7 @@ document.addEventListener("DOMContentLoaded", function () {
         let row = data[entry];
         // Version is a list, process to first element + info mark
         let version = "";
-        if (row["versions"].length == 0) {
+        if (row["versions"].length === 0) {
           version = "None";
         } else if (row["versions"].length == 1) {
           version = row["versions"][0].number;
@@ -497,7 +544,29 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }));
 
+  function addAlert(message, detail, success) {
 
+    let type = "alert-danger";
+    if (success) {
+      type = "alert-success";
+    }
+
+    let html = `
+      <div class="alert ` + type + ` alert-dismissible" role="alert">
+      <h3 class="mb-1">` + message + `</h3>
+      <p>` + detail + `</p>
+      <div class="btn-list">
+        <a href="#" class="btn btn-success">Okay</a>
+      </div>
+      <a class="btn-close" data-bs-dismiss="alert" aria-label="close"></a>
+      </div>
+    `;
+
+    let current = $("#alerts").html();
+    $("#alerts").html(html + current);
+
+// TODO: Once clicked the element should remove itself from the DOM properly
+  }
 
   function updateMeta(meta) {
     let data = $.ajax({
