@@ -25,14 +25,15 @@ setuptools.setup(
     python_requires=">=3.6",
     packages=setuptools.find_packages(exclude=["test", "doc"]),
     install_requires=["aiofiles",
-        "fastapi",
-        "markupsafe",
-        "pycryptodome",
-        "python-multipart",
-        "requests",
-        "tinydb",
-        "toml",
-        "uvicorn"],
+                      "fastapi",
+                      "markupsafe",
+                      "pycryptodome",
+                      "python-multipart",
+                      "requests",
+                      "tinydb",
+                      "toml",
+                      "uvicorn",
+                      "zeroconf"],
     scripts=['confrm_srv'],
     classifiers=["Intended Audience :: Users",
                  "Natural Language :: English"
@@ -40,4 +41,4 @@ setuptools.setup(
                  "Programming Language :: Python :: 3.6"],
     keywords="IOT deploy",
     include_package_data=True
-    )
+)
