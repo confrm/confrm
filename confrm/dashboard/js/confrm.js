@@ -440,7 +440,64 @@ document.addEventListener("DOMContentLoaded", function () {
   
     $("#node-table-title").html(meta["nodes"] + " Nodes Registerd");
   
+    let data = $.ajax({
+      url: "/nodes/",
+      type: "GET"
+    }).then(function (data) {
+
+      let html = "";
+
+      for (let entry in data) {
+        let row = data[entry];
+        // Version is a list, process to first element + info mark
+        let version = "";
+        if (row["versions"].length == 0) {
+          version = "None";
+        } else if (row["versions"].length == 1) {
+          version = row["versions"][0].number;
+        } else if (row["versions"].length > 1) {
+          version = row["versions"][0].number +
+            `&nbsp;
+            <svg class="icon packages-info-button" style="cursor:pointer" width="24" height="24" viewBox="0 0 24 24"
+            data-bs-toggle="modal" data-bs-target="#modal-package-info" data-package-name="` + entry + `">
+              <use xlink:href="/static/img/all.svg#gg-info"/>
+            </svg>`;
+        }
+        html += "<tr>";
+        html += `<td>` + row["title"] + ` <span class="text-muted">(` + entry + `)</span></td>`;
+        html += `<td>` + row["description"] + `</td>`;
+        html += `<td>` + version + `</td>`;
+        html += `<td>` + row["platform"] + `</td>`;
+        html += `
+          <td class="text-end">
+            <span class="dropdown">
+              <button class="btn dropdown-toggle align-text-top" data-bs-boundary="viewport"
+                data-bs-toggle="dropdown">Actions</button>
+              <div class="dropdown-menu dropdown-menu-end">
+                <div class="dropdown-item packages-action-upload" style="cursor:pointer" 
+                  data-bs-toggle="modal" data-bs-target="#modal-package-upload" data-package-name="` + entry + `"
+                  data-package-title="` + row.title + `" data-bs-backdrop="static" data-bs-keyboard="false">
+                  Upload new version
+                </div>
+                <div class="dropdown-item packages-info-button" style="cursor:pointer" 
+                  data-bs-toggle="modal" data-bs-target="#modal-package-info" data-package-name="` + entry + `">
+                  Manage versions
+                </div>
+                <div class="dropdown-item packages-action-upload" style="cursor:pointer" data-package-name=` + entry + `>
+                  Delete package
+                </div>
+              </div>
+            </span>
+          </td>`;
+        html += "</tr>";
+      }
+
+      $("#packages-table-body").html(html);
+
+    });
   }));
+
+
 
   function updateMeta(meta) {
     let data = $.ajax({

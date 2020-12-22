@@ -290,20 +290,22 @@ async def register_node(
     return {}
 
 
-@APP.get("/nodes/")
-async def get_nodes(package: str):
+@APP.get("/nodes/", status_code=status.HTTP_200_OK)
+async def get_nodes(response: Response, package: str = ""):
     """Returns a list of nodes using a given package
 
     Attributes:
         package (str): name of package to return node list for
     """
-    if CONFIG is None:
-        do_config()
 
     nodes = DB.table("nodes")
-    query = Query()
 
-    node_list = nodes.search(query.package == package)
+    node_list = []
+    if not package:
+        query = Query()
+        node_list = nodes.search(query.package == package)
+    else:
+        node_list = nodes.all()
 
     if len(node_list) == 0:
         return {}
