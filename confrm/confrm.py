@@ -33,9 +33,11 @@ from markupsafe import escape
 from pydantic import BaseModel  # pylint: disable=E0611
 
 from confrm.responses import ConfrmFileResponse
+from confrm.zeroconf import ConfrmZeroconf
 
 logger = logging.getLogger('confrm')
 logger.setLevel(logging.INFO)
+
 
 # pydantic data models are used to describe the inputs for the various REST
 # API calls, if the calls do not match these names and data-types then the call
@@ -61,7 +63,7 @@ class PackageVersion(BaseModel):  # pylint: disable=R0903
 APP = FastAPI()
 CONFIG = None
 DB = None
-
+ZEROCONF = ConfrmZeroconf()
 
 def do_config():
     """Gets the config based on an environment variable and sets up global
@@ -173,6 +175,8 @@ def format_package_info(package: dict, lite: bool = False):
     }
 
 
+
+
 # Files server in /static will point to ./dashboard (with respect to the running
 # script)
 APP.mount("/static",
@@ -187,6 +191,21 @@ async def startup_event():
 
     do_config()
 
+
+@APP.on_event("shutdown")
+async def shutdown_event():
+    """Is called on application shutdown"""
+
+    ZEROCONF.close()
+
+
+@APP.get("/zeroconf")
+async def test_zeroconf(name: str, package: str):
+    ZEROCONF.register_package(name, package)
+
+@APP.get("/unzeroconf")
+async def test_unzeroconf(name: str, package: str):
+    ZEROCONF.unregister_package(name, package)
 
 @APP.get("/")
 async def index():

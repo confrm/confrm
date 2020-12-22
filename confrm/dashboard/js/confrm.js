@@ -118,6 +118,7 @@ document.addEventListener("DOMContentLoaded", function () {
         html += "<tr>";
         html += `<td>` + row["title"] + ` <span class="text-muted">(` + entry + `)</span></td>`;
         html += `<td>` + row["description"] + `</td>`;
+        html += `<td>` + `ENABLED</td>`;
         html += `<td>` + version + `</td>`;
         html += `<td>` + row["platform"] + `</td>`;
         html += `
@@ -134,6 +135,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 <div class="dropdown-item packages-info-button ` + manage_versions +`" style="cursor:pointer;" 
                   data-bs-toggle="modal" data-bs-target="#modal-package-info" data-package-name="` + entry + `">
                   Manage versions
+                </div>
+                <div class="dropdown-item packages-arduino-button" style="cursor:pointer;" data-package-name=` + entry + `>
+                  Enable ArduinoIDE Interface
                 </div>
                 <div class="dropdown-item packages-action-upload" style="cursor:pointer" data-package-name=` + entry + `>
                   Delete package
@@ -153,6 +157,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
       $(".packages-info-button").unbind('click');
       $(".packages-info-button").click(function (sender) {
+        let name = sender.currentTarget.dataset.packageName;
+        setPackageVersionsModal(name);
+      });
+
+      $(".packages-arduino-button").unbind('click');
+      $(".packages-arduino-button").click(function (sender) {
         let name = sender.currentTarget.dataset.packageName;
         setPackageVersionsModal(name);
       });
@@ -497,7 +507,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     $("#page-content").html(templates["nodes"]["nodes.html"]);
   
-    $("#node-table-title").html(meta["nodes"] + " Nodes Registerd");
+    $("#node-table-title").html(meta["nodes"] + " Nodes Registered");
   
     let data = $.ajax({
       url: "/nodes/",
@@ -590,6 +600,8 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       if ("packages" === current_page) {
         $("#packages-table-title").html(meta["packages"] + " Packages Installed");
+      } else if ("nodes" == current_page) {
+        $("#node-table-title").html(meta["nodes"] + " Nodes Registered");
       }
     }).bind(meta));
   }
