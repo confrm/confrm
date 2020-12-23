@@ -155,7 +155,7 @@ def format_package_info(package: dict, lite: bool = False):
     # Minimal data for lite implementation
     if lite:
         return {
-            "current_version": current_version
+            "current_version": current_version,
         }
 
     versions = get_package_versions(package["name"], package)
@@ -599,7 +599,8 @@ async def check_for_update(name: str, node_id: str, response: Response):
                 (query.revision == int(parts[2])))
             return {
                 "current_version": package["current_version"],
-                "blob": version_entry["blob_id"]
+                "blob": version_entry["blob_id"],
+                "hash": version_entry["hash"]
             }
 
         response.status_code = status.HTTP_404_NOT_FOUND
