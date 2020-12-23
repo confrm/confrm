@@ -38,6 +38,12 @@ document.addEventListener("DOMContentLoaded", function () {
   // For messaging to form elements
   var active_package = "";
 
+  // For storing which nodes have been drawn for the nodes pages
+  drawn_nodes = [];
+
+  // Call the update function every 300ms
+  setInterval(updateUIEvent, 300);
+
   /* Populate the navbar */
   let html = '<ul class="navbar-nav pt-lg-3">';
   for (let nav_element in nav_elements) {
@@ -509,62 +515,88 @@ document.addEventListener("DOMContentLoaded", function () {
   
     $("#node-table-title").html(meta["nodes"] + " Nodes Registered");
   
+    // This list is used to track which nodes are currently drawn on the screen.
+    // As this method is being called we can assume that this should be cleared
+    // pending an update when updateNodeTables is called.
+    drawn_nodes = [];
+
+    updateNodesTable();
+
+  }));
+
+  function updateNodesTable() {
+
     let data = $.ajax({
       url: "/nodes/",
       type: "GET"
     }).then(function (data) {
 
-      let html = "";
-
       for (let entry in data) {
+
         let row = data[entry];
-        // Version is a list, process to first element + info mark
-        let version = "";
-        if (row["versions"].length === 0) {
-          version = "None";
-        } else if (row["versions"].length == 1) {
-          version = row["versions"][0].number;
-        } else if (row["versions"].length > 1) {
-          version = row["versions"][0].number +
-            `&nbsp;
-            <svg class="icon packages-info-button" style="cursor:pointer" width="24" height="24" viewBox="0 0 24 24"
-            data-bs-toggle="modal" data-bs-target="#modal-package-info" data-package-name="` + entry + `">
-              <use xlink:href="/static/img/all.svg#gg-info"/>
-            </svg>`;
+
+        let is_drawn = false;
+        for (let node in drawn_nodes) {
+          if (drawn_nodes[node] == row.node_id) {
+            is_drawn = true;
+            console.log("is drawn");
+          }
         }
-        html += "<tr>";
-        html += `<td>` + row["title"] + ` <span class="text-muted">(` + entry + `)</span></td>`;
-        html += `<td>` + row["description"] + `</td>`;
-        html += `<td>` + version + `</td>`;
-        html += `<td>` + row["platform"] + `</td>`;
-        html += `
-          <td class="text-end">
-            <span class="dropdown">
-              <button class="btn dropdown-toggle align-text-top" data-bs-boundary="viewport"
-                data-bs-toggle="dropdown">Actions</button>
-              <div class="dropdown-menu dropdown-menu-end">
-                <div class="dropdown-item packages-action-upload" style="cursor:pointer" 
-                  data-bs-toggle="modal" data-bs-target="#modal-package-upload" data-package-name="` + entry + `"
-                  data-package-title="` + row.title + `" data-bs-backdrop="static" data-bs-keyboard="false">
-                  Upload new version
+
+        if (!is_drawn) {
+          let html = "";
+          html += `<tr id="node-` + row.node_id.replace(/:/g, "_") + `">`;
+          html += `<td>` + row.node_id + `</td>`;
+          html += `<td class="node-description">` + row.description + `</td>`;
+          html += `<td class="node-package">` + row.package + `</td>`;
+          html += `<td class="node-version">` + row.version + `</td>`;
+          html += `<td class="node-platform">` + row.platform + `</td>`;
+          html += `<td class="node-last_seen">` + row.last_seen + `</td>`;
+          html += `<td class="node-last_updated">` + row.last_updated + `</td>`;
+          html += `
+            <td class="text-end">
+              <span class="dropdown">
+                <button class="btn dropdown-toggle align-text-top" data-bs-boundary="viewport"
+                  data-bs-toggle="dropdown">Actions</button>
+                <div class="dropdown-menu dropdown-menu-end">
+                  <div class="dropdown-item packages-action-upload" style="cursor:pointer" 
+                    data-bs-toggle="modal" data-bs-target="#modal-package-upload" data-package-name="` + entry + `"
+                    data-package-title="` + row.title + `" data-bs-backdrop="static" data-bs-keyboard="false">
+                    Upload new version
+                  </div>
+                  <div class="dropdown-item packages-info-button" style="cursor:pointer" 
+                    data-bs-toggle="modal" data-bs-target="#modal-package-info" data-package-name="` + entry + `">
+                    Manage versions
+                  </div>
+                  <div class="dropdown-item packages-action-upload" style="cursor:pointer" data-package-name=` + entry + `>
+                    Delete package
+                  </div>
                 </div>
-                <div class="dropdown-item packages-info-button" style="cursor:pointer" 
-                  data-bs-toggle="modal" data-bs-target="#modal-package-info" data-package-name="` + entry + `">
-                  Manage versions
-                </div>
-                <div class="dropdown-item packages-action-upload" style="cursor:pointer" data-package-name=` + entry + `>
-                  Delete package
-                </div>
-              </div>
-            </span>
-          </td>`;
-        html += "</tr>";
+              </span>
+            </td>`;
+          html += "</tr>"; 
+          $("#nodes-table-body").append(html);
+          drawn_nodes.push(row.node_id);
+        } else {
+          let headings = ["description", "package", "version", "platform", "last_seen", "last_updated"];
+          let node_id_tag = "#node-" + row.node_id.replace(/:/g, "_");
+          for (let heading in headings) {
+            let current = $(node_id_tag + " .node-" + headings[heading]).html();
+            let element_type = typeof row[headings[heading]];
+            if ("number" === element_type) {
+              current = parseInt(current);
+            }
+            if (current !== row[headings[heading]]) {
+              $(node_id_tag + " .node-" + headings[heading]).html(row[headings[heading]]);
+            }
+          }
+        }
       }
 
-      $("#packages-table-body").html(html);
 
     });
-  }));
+
+  }
 
   function addAlert(message, detail, success) {
 
@@ -611,6 +643,12 @@ document.addEventListener("DOMContentLoaded", function () {
       if (pages[page].name === name) {
         pages[page]();
       }
+    }
+  }
+
+  function updateUIEvent() {
+    if ("nodes" == current_page) {
+      updateNodesTable();
     }
   }
 

@@ -16,6 +16,7 @@ limitations under the License.
 """
 
 import base64
+import datetime
 import logging
 import os
 import time
@@ -272,7 +273,7 @@ async def register_node(
     package = escape(package)
     version = escape(version)
     description = escape(description)
-    platform = escape(description)
+    platform = escape(platform)
 
     package_entry = packages.get(query.name == package)
     if package_entry is None:
@@ -304,6 +305,10 @@ async def register_node(
         node_entry["last_updated"] = round(time.time())
     node_entry["last_seen"] = round(time.time())
 
+    node_entry["package"] = package
+    node_entry["description"] = description
+    node_entry["platform"] = platform
+
     nodes.update(node_entry, query.node_id == node_id)
 
     return {}
@@ -321,13 +326,21 @@ async def get_nodes(package: str = ""):
 
     node_list = []
     if not package:
+        node_list = nodes.all()
+    else:
         query = Query()
         node_list = nodes.search(query.package == package)
-    else:
-        node_list = nodes.all()
 
     if len(node_list) == 0:
         return {}
+
+    for node in node_list:
+        if node["last_updated"] != -1:
+            value = datetime.datetime.fromtimestamp(node["last_updated"])
+            node["last_updated"] = f"{value:%Y-%m-%d %H:%M:%S}"
+        if node["last_seen"] != -1:
+            value = datetime.datetime.fromtimestamp(node["last_seen"])
+            node["last_seen"] = f"{value:%Y-%m-%d %H:%M:%S}"
 
     return node_list
 
