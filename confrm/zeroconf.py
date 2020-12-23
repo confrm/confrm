@@ -27,7 +27,7 @@ class ConfrmZeroconf:
 
         service_name = f"Confrm[{name}-{platform}]"
         service_info = ServiceInfo(
-                "_" + service_name + "._arduino._tcp.local.",
+            "_" + service_name + "._arduino._tcp.local.",
             service_name + "._arduino._tcp.local.",
             addresses=[socket.inet_aton("127.0.0.1")],
             port=8266,
@@ -76,7 +76,7 @@ class ConfrmZeroconf:
         self.mutex.acquire()
         try:
             self.zeroconf.unregister_service(
-                ZEROCONF_SERVICES[service_ind]["info"])
+                self.services[service_ind]["info"])
             del self.services[service_ind]
         finally:
             self.mutex.release()
