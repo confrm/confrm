@@ -66,6 +66,7 @@ CONFIG = None
 DB = None
 ZEROCONF = ConfrmZeroconf()
 
+
 def do_config():
     """Gets the config based on an environment variable and sets up global
     objects as required """
@@ -176,8 +177,6 @@ def format_package_info(package: dict, lite: bool = False):
     }
 
 
-
-
 # Files server in /static will point to ./dashboard (with respect to the running
 # script)
 APP.mount("/static",
@@ -204,9 +203,11 @@ async def shutdown_event():
 async def test_zeroconf(name: str, package: str):
     ZEROCONF.register_package(name, package)
 
+
 @APP.get("/unzeroconf")
 async def test_unzeroconf(name: str, package: str):
     ZEROCONF.unregister_package(name, package)
+
 
 @APP.get("/")
 async def index():
@@ -563,9 +564,8 @@ async def check_for_update(name: str, node_id: str, response: Response):
     """Called by node wanting to know if an update is available
 
     Will return the most recent package version for the given package name.
-    Will check to see if a canary entry has been made for the node, if it has
-    and the canary package name is consistent then the canary version will be
-    returned.
+    Will check to see if a canary entry has been made for the node, if it is then
+    the be canary settings will be returned.
 
     Arguments:
         name (str): Package to check for update for
@@ -582,38 +582,42 @@ async def check_for_update(name: str, node_id: str, response: Response):
 
     query = Query()
 
-    package = packages.get(query.name == name)
-    if package is not None:
+    package_doc = packages.get(query.name == name)
+    if package_doc is not None:
 
         # Check to see if there is a canary entry for this node
         node = nodes.get(query.node_id == node_id)
         if node is not None:
             if "canary" in node.keys():
-                # Check to see if canary is the right package, if it isnt
-                # then return back to the normal flow
-                if node["canary"]["package"] == name:
-                    parts = node["canary"]["version"]
-                    version_entry = package_versions.get(
-                        (query.name == name) &
-                        (query.major == int(parts[0])) &
-                        (query.minor == int(parts[1])) &
-                        (query.revision == int(parts[2])))
+                # TODO: Refactor to use get_version
+                parts = node["canary"]["version"].split(".")
+                version_entry = package_versions.get(
+                    (query.name == node["canary"]["package"]) &
+                    (query.major == int(parts[0])) &
+                    (query.minor == int(parts[1])) &
+                    (query.revision == int(parts[2])))
+                # TODO: Refector for getting package by name
+                canary_package = packages.get(
+                    query.name == node["canary"]["package"])
                 return {
-                    "current_version": package["current_version"],
-                    "blob": version_entry["blob_id"]
+                    "current_version": canary_package["current_version"],
+                    "blob": version_entry["blob_id"],
+                    "hash": version_entry["hash"],
+                    "force": True
                 }
 
-        if "current_version" in package.keys():
-            parts = package["current_version"].split(".")
+        if "current_version" in package_doc.keys():
+            parts = package_doc["current_version"].split(".")
             version_entry = package_versions.get(
                 (query.name == name) &
                 (query.major == int(parts[0])) &
                 (query.minor == int(parts[1])) &
                 (query.revision == int(parts[2])))
             return {
-                "current_version": package["current_version"],
+                "current_version": package_doc["current_version"],
                 "blob": version_entry["blob_id"],
-                "hash": version_entry["hash"]
+                "hash": version_entry["hash"],
+                "force": False
             }
 
         response.status_code = status.HTTP_404_NOT_FOUND
@@ -661,6 +665,58 @@ async def set_active_version(name: str, version: str):
     if len(result) > 0:
         return {"ok": True}
     return {"ok": False}
+
+
+@APP.put("/node_package/", status_code=status.HTTP_200_OK)
+async def node_package(node_id: str, package: str, response: Response, version: str = ""):
+    """Force a node to use a particular package using canary feature"""
+
+    query = Query()
+    packages = DB.table("packages")
+    nodes = DB.table("nodes")
+
+    package_doc = packages.get(query.name == package)
+    if package_doc is None:
+        msg = "Package not found"
+        logging.info(msg)
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return {
+            "error": "confrm-007",
+            "message": msg,
+            "detail": "While attempting to set a node to use a particular package the package" +
+            " name given was not found"
+        }
+
+    if not package_doc["current_version"]:
+        msg = "Package has no active version"
+        logging.info(msg)
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return {
+            "error": "confrm-008",
+            "message": msg,
+            "detail": "While attempting to set a node to use a particular package the package" +
+            " was found to have no active versions"
+        }
+
+    node_doc = nodes.get(query.node_id == node_id)
+    if node_doc is None:
+        msg = "Node not found"
+        logging.info(msg)
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return {
+            "error": "confrm-008",
+            "message": msg,
+            "detail": "While attempting to set a node to use a particular package the node" +
+            " was not found"
+        }
+
+    node_doc["canary"] = {
+        "package": package,
+        "version": package_doc["current_version"]
+    }
+    nodes.update(node_doc, query.node_id == node_id)
+
+    return {}
 
 
 @APP.get("/blob/")

@@ -234,6 +234,88 @@ def test_post_package_version():
                 assert response.json()["error"] == "confrm-006"
 
 
+def test_put_node_package():
+    """Tests changing the package for a given node"""
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        config_file = os.path.join(data_dir, CONFIG_NAME)
+        with open(config_file, "w") as file:
+            file.write(get_config_file(data_dir))
+        os.environ["CONFRM_CONFIG"] = config_file
+
+        test_file_content = bytearray(os.urandom(1000))
+        test_file = os.path.join(data_dir, "test.bin")
+        with open(test_file, "wb") as file_ptr:
+            file_ptr.write(test_file_content)
+
+        with TestClient(APP) as client:
+
+            # Create two packages for testing
+            response = client.put("/package/" +
+                                  "?name=package_a" +
+                                  "&description=some%20description" +
+                                  "&title=Good%20Name" +
+                                  "&platform=esp32")
+            assert response.status_code == 201
+
+            response = client.put("/package/" +
+                                  "?name=package_b" +
+                                  "&description=some%20description" +
+                                  "&title=Good%20Name" +
+                                  "&platform=esp32")
+            assert response.status_code == 201
+
+            # Add active versions to both packages
+            with open(test_file, "rb") as file_ptr:
+                response = client.post("/package_version/" +
+                                       "?name=package_a" +
+                                       "&major=0" +
+                                       "&minor=1" +
+                                       "&revision=0" +
+                                       "&set_active=true",
+                                       files={"file": ("filename", file_ptr, "application/binary")})
+                assert response.status_code == 201
+
+            with open(test_file, "rb") as file_ptr:
+                response = client.post("/package_version/" +
+                        "?name=package_b" +
+                                       "&major=0" +
+                                       "&minor=2" +
+                                       "&revision=0" +
+                                       "&set_active=true",
+                                       files={"file": ("filename", file_ptr, "application/binary")})
+                assert response.status_code == 201
+
+            # Register a node with confrm
+            response = client.put("/register_node/" +
+                                  "?node_id=0:12:3:4" +
+                                  "&package=package_a" +
+                                  "&version=" +
+                                  "&description=some%20description" +
+                                  "&platform=esp32")
+            assert response.status_code == 200
+
+            # Check for update
+            response = client.get("/check_for_update/" +
+                                  "?node_id=0:12:3:4" +
+                                  "&name=package_a")
+            assert response.status_code == 200
+            assert response.json()["current_version"] == "0.1.0"
+
+            # Force the next version to be a different package using canary feature
+            response = client.put("/node_package/" +
+                                  "?node_id=0:12:3:4" +
+                                  "&package=package_b")
+            assert response.status_code == 200
+
+            # Check for update (will be a package with version 0.2.0)
+            response = client.get("/check_for_update/" +
+                                  "?node_id=0:12:3:4" +
+                                  "&name=package_a")
+            assert response.status_code == 200
+            assert response.json()["current_version"] == "0.2.0"
+            assert response.json()["force"] == True
+
 # register_node
 # nodes
 # packages

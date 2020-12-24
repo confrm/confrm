@@ -16,10 +16,6 @@ document.addEventListener("DOMContentLoaded", function () {
       "icon": "gg-smartphone-ram",
       "templates": ["nodes.html"]
     },
-    {
-      "name": "Keys",
-      "icon": "gg-key"
-    }
   ];
 
   // For storing draw methods
@@ -41,8 +37,8 @@ document.addEventListener("DOMContentLoaded", function () {
   // For storing which nodes have been drawn for the nodes pages
   drawn_nodes = [];
 
-  // Call the update function every 300ms
-  setInterval(updateUIEvent, 300);
+  // Call the update function every 1200ms
+  setInterval(updateUIEvent, 1200);
 
   /* Populate the navbar */
   let html = '<ul class="navbar-nav pt-lg-3">';
@@ -156,12 +152,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       $("#packages-table-body").html(html);
 
-      $('.toast').toast({
-        autohide: true,
-        delay: 5000
-      }).toast('hide');
-
-      $(".packages-info-button").unbind('click');
+         $(".packages-info-button").unbind('click');
       $(".packages-info-button").click(function (sender) {
         let name = sender.currentTarget.dataset.packageName;
         setPackageVersionsModal(name);
@@ -539,7 +530,6 @@ document.addEventListener("DOMContentLoaded", function () {
         for (let node in drawn_nodes) {
           if (drawn_nodes[node] == row.node_id) {
             is_drawn = true;
-            console.log("is drawn");
           }
         }
 
@@ -559,24 +549,55 @@ document.addEventListener("DOMContentLoaded", function () {
                 <button class="btn dropdown-toggle align-text-top" data-bs-boundary="viewport"
                   data-bs-toggle="dropdown">Actions</button>
                 <div class="dropdown-menu dropdown-menu-end">
-                  <div class="dropdown-item packages-action-upload" style="cursor:pointer" 
-                    data-bs-toggle="modal" data-bs-target="#modal-package-upload" data-package-name="` + entry + `"
-                    data-package-title="` + row.title + `" data-bs-backdrop="static" data-bs-keyboard="false">
-                    Upload new version
+                  <div class="dropdown-item nodes-change-button" style="cursor:pointer" 
+                    data-bs-toggle="modal" data-bs-target="#modal-node" data-package="` + entry + `"
+                    data-nodeid="` + row.node_id + `" data-description="` + row.description + `" data-bs-backdrop="static"
+                    data-bs-keyboard="false">
+                    Change Package
                   </div>
-                  <div class="dropdown-item packages-info-button" style="cursor:pointer" 
-                    data-bs-toggle="modal" data-bs-target="#modal-package-info" data-package-name="` + entry + `">
-                    Manage versions
+                  <div class="dropdown-item nodes-configure-button" style="cursor:pointer" 
+                    data-bs-toggle="modal" data-bs-target="#modal-package-info" data-package="` + entry + `">
+                    Configure Variables
                   </div>
-                  <div class="dropdown-item packages-action-upload" style="cursor:pointer" data-package-name=` + entry + `>
-                    Delete package
+                  <div class="dropdown-item nodes-delete-button" style="cursor:pointer" data-package=` + entry + `>
+                    Delete Node
                   </div>
                 </div>
               </span>
             </td>`;
-          html += "</tr>"; 
+          html += "</tr>";
+          
           $("#nodes-table-body").append(html);
           drawn_nodes.push(row.node_id);
+
+          $('.nodes-change-button').unbind("click");
+          $('.nodes-change-button').click(function(sender) {
+            // Populate the modal 
+            let node_id = sender.currentTarget.dataset.nodeid;
+            let node_description = sender.currentTarget.dataset.description;
+            let current_package = sender.currentTarget.dataset.package;
+
+            $("#modal-node .modal-title").html("Change package (" + node_id + " - " + node_description + ")");
+
+            let data = $.ajax({
+              url: "/packages/",
+              type: "GET"
+            }).then(function (data) {
+              
+              let html = `<select class="form-select nodes-change-package-selection">`;
+              for (let package in data) {
+                html += `<option value="` + data[package].name + `"`;
+                if (data[package].name === current_package) {
+                  html += ` selected`;
+                }
+                html += `">` + data[package].title + ` (` + data[package].name + `)</option>`
+              }
+              html += `</option>`;
+              $("#modal-node .modal-body").html(html);
+            });
+
+          });
+
         } else {
           let headings = ["description", "package", "version", "platform", "last_seen", "last_updated"];
           let node_id_tag = "#node-" + row.node_id.replace(/:/g, "_");
@@ -651,6 +672,7 @@ document.addEventListener("DOMContentLoaded", function () {
       updateNodesTable();
     }
   }
+  
 
 });
 
