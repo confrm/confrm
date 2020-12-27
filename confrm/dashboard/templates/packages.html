@@ -22,7 +22,7 @@
             <line x1="5" y1="12" x2="19" y2="12" /></svg>
           Add new package
         </a>
-        <a href="#" class="btn btn-primary d-sm-none btn-icon" data-bs-toggle="modal" data-bs-target="#modal-pacakge-add"
+        <a href="#" class="btn btn-primary d-sm-none btn-icon" data-bs-toggle="modal" data-bs-target="#modal-package-add"
           aria-label="Add new package" data-bs-backdrop="static">
           <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24"
             stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -71,7 +71,7 @@
       <div class="modal-body">
         <div class="mb-3">
           <label class="form-label">Name</label>
-          <input type="text" class="form-control" name="name" placeholder="Name (0-9a-zA-Z only)">
+          <input type="text" class="form-control" id="package-add-input-name" name="name" placeholder="Name (0-9a-zA-Z only)">
         </div>
         <div class="mb-3">
           <label class="form-label">Title</label>
@@ -90,7 +90,7 @@
         <a href="#" class="btn btn-link link-secondary" data-bs-dismiss="modal">
           Cancel
         </a>
-        <div class="btn btn-primary ms-auto package-add-submit" data-bs-dismiss="modal">
+        <div class="btn btn-primary ms-auto package-add-submit">
           <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24"
             stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
             <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
