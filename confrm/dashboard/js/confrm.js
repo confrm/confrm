@@ -234,6 +234,7 @@ document.addEventListener("DOMContentLoaded", function () {
               break;
           }
         }
+
         if (!valid) {
           return; // Don't do it
         }
@@ -355,7 +356,6 @@ document.addEventListener("DOMContentLoaded", function () {
           $(".package-deployment-canary").html("");
         }
 
-
       });
 
       $(".package-add-submit").unbind("click");
@@ -369,6 +369,14 @@ document.addEventListener("DOMContentLoaded", function () {
           switch (elements[element].name) {
             case "name":
               name = value;
+              const regex = /^[0-9a-zA-Z_-]+$/gm;
+              if (regex.exec(name) === null) {
+                name_element = $("#package-add-input-name");
+                name_element.removeClass("is-invalid");
+                name_element.removeClass("is-valid");
+                name_element.addClass("is-invalid");
+                return;
+              }
               break;
             case "title":
               title = value;

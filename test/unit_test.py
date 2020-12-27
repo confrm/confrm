@@ -155,6 +155,22 @@ def test_put_package():
             assert response.status_code == 200
             assert response.json()["title"] == "good_name"
 
+            # Check invalid names are rejected (space)
+            response = client.put("/package/" +
+                                  "?name=test%20package" +
+                                  "&description=some%20description" +
+                                  "&title=Good%20Name" +
+                                  "&platform=esp32")
+            assert response.status_code == 400
+
+            # Check invalid names are rejected (asterisk)
+            response = client.put("/package/" +
+                                  "?name=test%2Apackage" +
+                                  "&description=some%20description" +
+                                  "&title=Good%20Name" +
+                                  "&platform=esp32")
+            assert response.status_code == 400
+
 
 def test_post_package_version():
     """Tests adding versions for a given package"""
