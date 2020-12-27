@@ -19,6 +19,7 @@ import base64
 import datetime
 import logging
 import os
+import re
 import time
 import uuid
 
@@ -386,7 +387,21 @@ async def put_package(response: Response, package: Package = Depends()):
         return {
             "error": "confrm-004",
             "message": msg,
-            "detail": "While attempting to add a new package the package name was to to \"\""
+            "detail": "While attempting to add a new package the package name was set to \"\""
+        }
+
+    pattern = '^[0-9a-zA-Z_-]+$'
+    regex = re.compile(pattern)
+
+    if regex.match(package_dict["name"]) is None:
+        msg = f"Package name does not match pattern {pattern}"
+        logging.info(msg)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {
+            "error": "confrm-010",
+            "message": msg,
+            "detail": "While attempting to add a new package the package name did not match the"
+            f" pattern {pattern}"
         }
 
     if not package.title:
@@ -704,7 +719,7 @@ async def node_package(node_id: str, package: str, response: Response, version: 
         logging.info(msg)
         response.status_code = status.HTTP_404_NOT_FOUND
         return {
-            "error": "confrm-008",
+            "error": "confrm-009",
             "message": msg,
             "detail": "While attempting to set a node to use a particular package the node" +
             " was not found"
