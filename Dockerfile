@@ -7,7 +7,7 @@ RUN apk add --no-cache \
     gcc musl-dev
 
 RUN pip install git+https://github.com/confrm/confrm.git && mkdir /confrm
-RUN cp ./default/config.toml /config.toml
+COPY ./default/config.toml /config.toml
 
 EXPOSE 80
 
