@@ -34,12 +34,14 @@ def check_config_file(config):
     for element in elements:
         if element not in config.keys():
             raise Exception(f"Config does not contain '{element}' element")
-    basic_names = ["port"]
+
+    basic_names = ["port", "host"]
     for name in basic_names:
         if name not in config["basic"].keys():
             raise Exception(
                 f"Config element 'basic' does not contain '{name}'"
             )
+
     storage_names = ["data_dir"]
     for name in storage_names:
         if name not in config["storage"].keys():
@@ -73,7 +75,8 @@ def main():
     # worker may cause issues working with information in the db.
     uvicorn.run(
             "confrm:APP",
-            host="10.0.1.106",
+            host=config["basic"]["host"],
+            port=config["basic"]["port"],
             workers=1)
 
 if __name__ == "__main__":
