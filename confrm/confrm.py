@@ -636,7 +636,6 @@ async def check_for_update(name: str, node_id: str, response: Response):
         # Check to see if there is a canary entry for this node
         node = nodes.get(query.node_id == node_id)
         if node is not None:
-            print(node)
             if "canary" in node.keys():
                 version_doc = get_package_version_by_version_string(
                     node["canary"]["package"],
