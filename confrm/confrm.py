@@ -48,7 +48,6 @@ import uuid
 import toml
 
 from Crypto.Hash import SHA256
-from Crypto.PublicKey import RSA
 from fastapi import FastAPI, File, Depends, Response, Request, status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -647,7 +646,6 @@ async def check_for_update(name: str, node_id: str, response: Response):
     """
 
     packages = DB.table("packages")
-    package_versions = DB.table("package_versions")
     nodes = DB.table("nodes")
 
     query = Query()
@@ -933,8 +931,6 @@ async def get_config(key: str, response: Response, package: str = "", node_id: s
 
     query = Query()
     config = DB.table("config")
-
-    print(config.all())
 
     if node_id:
         doc = config.get((query.type == "node") &
