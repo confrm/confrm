@@ -178,6 +178,19 @@ def format_package_info(package: dict, lite: bool = False):
     }
 
 
+def get_package_version_by_version_string(package_name: str, version: str):
+    """Get package version using string name and string version number"""
+
+    package_versions = DB.table("package_versions")
+    query = Query()
+    parts = version.split(".")
+    return package_versions.get(
+        (query.name == package_name) &
+        (query.major == int(parts[0])) &
+        (query.minor == int(parts[1])) &
+        (query.revision == int(parts[2])))
+
+
 # Files server in /static will point to ./dashboard (with respect to the running
 # script)
 APP.mount("/static",
@@ -528,12 +541,7 @@ async def del_package_version(name: str, version: str):
                 return {"ok": False}
 
     package_versions = DB.table("package_versions")
-    parts = version.split(".")
-    version_entry = package_versions.get(
-        (query.name == name) &
-        (query.major == int(parts[0])) &
-        (query.minor == int(parts[1])) &
-        (query.revision == int(parts[2])))
+    version_entry = get_package_version_by_version_string(name, version)
 
     if version_entry is None:
         return {"ok": False}
@@ -604,13 +612,9 @@ async def check_for_update(name: str, node_id: str, response: Response):
         node = nodes.get(query.node_id == node_id)
         if node is not None:
             if "canary" in node.keys():
-                # TODO: Refactor to use get_version
-                parts = node["canary"]["version"].split(".")
-                version_entry = package_versions.get(
-                    (query.name == node["canary"]["package"]) &
-                    (query.major == int(parts[0])) &
-                    (query.minor == int(parts[1])) &
-                    (query.revision == int(parts[2])))
+                version_entry = get_package_version_by_version_string(
+                    node["canary"]["package"],
+                    node["canary"]["version"])
                 # TODO: Refector for getting package by name
                 canary_package = packages.get(
                     query.name == node["canary"]["package"])
@@ -622,12 +626,9 @@ async def check_for_update(name: str, node_id: str, response: Response):
                 }
 
         if "current_version" in package_doc.keys():
-            parts = package_doc["current_version"].split(".")
-            version_entry = package_versions.get(
-                (query.name == name) &
-                (query.major == int(parts[0])) &
-                (query.minor == int(parts[1])) &
-                (query.revision == int(parts[2])))
+            version_entry = get_package_version_by_version_string(
+                name,
+                package_doc["current_version"])
             return {
                 "current_version": package_doc["current_version"],
                 "blob": version_entry["blob_id"],
@@ -654,24 +655,17 @@ async def check_for_update(name: str, node_id: str, response: Response):
 @APP.put("/set_active_version/")
 async def set_active_version(name: str, version: str):
     """ Set the active version via the API """
-    if CONFIG is None:
-        do_config()
+    # TODO: Set error codes
 
     query = Query()
     packages = DB.table("packages")
-    package_versions = DB.table("package_versions")
 
     package_entry = packages.get(query.name == name)
     if package_entry is None:
         return {"ok": False, "info": "Package does not exist"}
 
-    parts = version.split(".")
-    version_entry = package_versions.search(
-        (query.name == name) &
-        (query.major == int(parts[0])) &
-        (query.minor == int(parts[1])) &
-        (query.revision == int(parts[2])))
-    if len(version_entry) < 1:
+    version_doc = get_package_version_by_version_string(name, version)
+    if len(version_doc) < 1:
         return {"ok": False, "info": "Specified version does not exist for package"}
 
     package_entry["current_version"] = version

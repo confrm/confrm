@@ -12,7 +12,7 @@ CONFIG_NAME = "confrm.toml"
 
 
 def get_config_file(path: str):
-    """Returns a valid config file with data directroy set to input argument"""
+    """Returns a valid config file with data directory set to input argument"""
     ret = '' + \
           '[basic]\n' + \
           'port = 8001\n\n' + \
@@ -330,7 +330,7 @@ def test_put_node_package():
                                   "&name=package_a")
             assert response.status_code == 200
             assert response.json()["current_version"] == "0.2.0"
-            assert response.json()["force"] == True
+            assert response.json()["force"]
 
 # register_node
 # nodes
