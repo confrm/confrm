@@ -382,12 +382,82 @@ def test_put_node_package():
             assert response.json()["current_version"] == "0.2.1"
             assert not response.json()["force"]
 
-# register_node
-# nodes
-# packages
-# add_package
-# package
-# package_version (post)
-# package version (delete)
-# set_active_version
-# blob
+
+def test_config():
+    """Tests config functions"""
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        config_file = os.path.join(data_dir, CONFIG_NAME)
+        with open(config_file, "w") as file:
+            file.write(get_config_file(data_dir))
+        os.environ["CONFRM_CONFIG"] = config_file
+
+        with TestClient(APP) as client:
+
+            # Create package for testing
+            response = client.put("/package/" +
+                                  "?name=package_a" +
+                                  "&description=some%20description" +
+                                  "&title=Good%20Name" +
+                                  "&platform=esp32")
+            assert response.status_code == 201
+
+            # Create node for testing
+            response = client.put("/register_node/" +
+                                  "?node_id=0:12:3:4" +
+                                  "&package=package_a" +
+                                  "&version=0.2.0" +
+                                  "&description=some%20description" +
+                                  "&platform=esp32")
+
+            # Add a new global config
+            response = client.put("/config/" +
+                                   "?type=global" +
+                                   "&id=" +
+                                   "&key=key_a"
+                                   "&value=value_a")
+            assert response.status_code == 201
+
+            # Add a new package config
+            response = client.put("/config/" +
+                                   "?type=package" +
+                                   "&id=package_a" +
+                                   "&key=key_b"
+                                   "&value=value_b")
+            assert response.status_code == 201
+
+            # Add a new node config
+            response = client.put("/config/" +
+                                   "?type=node" +
+                                   "&id=0:12:3:4"+
+                                   "&key=key_c"
+                                   "&value=value_c")
+            assert response.status_code == 201
+
+            # Test for duplicate key name (key_b, different type)
+            response = client.put("/config/" +
+                                   "?type=" +
+                                   "&id=package_a" +
+                                   "&key=key_b"
+                                   "&value=value_b")
+            assert response.status_code == 400
+            assert response.json()["error"] == "confrm-12"
+
+            # Test for non-existing package
+            response = client.put("/config/" +
+                                   "?type=package" +
+                                   "&id=package_z" +
+                                   "&key=key_z"
+                                   "&value=value_b")
+            assert response.status_code == 400
+            assert response.json()["error"] == "confrm-13"
+
+            # Test for non-existing node
+            response = client.put("/config/" +
+                                   "?type=node" +
+                                   "&id=0:12:3:5"+
+                                   "&key=key_x"
+                                   "&value=value_x")
+            assert response.status_code == 400
+            assert response.json()["error"] == "confrm-14"
+
