@@ -126,7 +126,8 @@ document.addEventListener("DOMContentLoaded", function () {
         html += `
           <td class="text-end">
             <span class="dropdown">
-              <button class="btn dropdown-toggle align-text-top" data-bs-boundary="viewport"
+
+              <button class="btn dropdown-toggle align-text-top"  data-bs-boundary="viewport"
                 data-bs-toggle="dropdown">Actions</button>
               <div class="dropdown-menu dropdown-menu-end">
                 <div class="dropdown-item packages-action-upload" style="cursor:pointer" 
@@ -146,7 +147,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 </div>
               </div>
             </span>
-          </td>`;8
+          </td>`;
         html += "</tr>";
       }
 
@@ -262,7 +263,7 @@ document.addEventListener("DOMContentLoaded", function () {
           contentType: false   // tell jQuery not to set contentType
         }).fail(function (jqXHR, textStatus, errorThrown) {
           let json = jqXHR.responseJSON;
-          addAlert(json.message, json.detail, false);
+          addAlert(json.message, json.detail, "ERROR");
           $(".package-add-submit").unbind("click");
           $("[data-bs-dismiss=modal]").trigger({ type: "click" });
         }).done(function (data, textStatus, jqXHR) {
@@ -270,6 +271,13 @@ document.addEventListener("DOMContentLoaded", function () {
           $("[data-bs-dismiss=modal]").trigger({ type: "click" });
           updateMeta(meta);
           showPage("packages");
+          let json = jqXHR.responseJSON;
+          if ("undefined" !== typeof json.warning) {
+            addAlert(json.message, json.detail, "WARNING");
+          }
+          if ("undefined" !== typeof json.info) {
+            addAlert(json.message, json.detail, "INFO");
+          }
         });
 
         return false;
@@ -403,7 +411,7 @@ document.addEventListener("DOMContentLoaded", function () {
           type: "PUT"
         }).fail(function (jqXHR, textStatus, errorThrown) {
           let json = jqXHR.responseJSON;
-          addAlert(json.message, json.detail, false);
+          addAlert(json.message, json.detail, "ERROR");
           $(".package-add-submit").unbind("click");
           $("[data-bs-dismiss=modal]").trigger({ type: "click" });
         }).done(function (data, textStatus, jqXHR) {
@@ -627,15 +635,27 @@ document.addEventListener("DOMContentLoaded", function () {
 
   }
 
-  function addAlert(message, detail, success) {
+  function addAlert(message, detail, state) {
 
-    let type = "alert-danger";
-    if (success) {
-      type = "alert-success";
+    let type = "";
+    switch (state) {
+      case "WARNING":
+        type = "alert-warning";
+        break;
+      case "SUCCESS":
+        type = "alert-success";
+        break;
+      case "INFO":
+        type = "alert-info";
+        break;
+      case "ERROR":
+      default:
+        type = "alert-danger";
+        break;
     }
 
     let html = `
-      <div class="alert ` + type + ` alert-dismissible" role="alert">
+      <div class="alert ` + type + ` alert-dismissable" role="alert">
       <h3 class="mb-1">` + message + `</h3>
       <p>` + detail + `</p>
       <div class="btn-list">
