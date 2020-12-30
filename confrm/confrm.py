@@ -27,7 +27,7 @@ import toml
 
 from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
-from fastapi import FastAPI, File, Depends, Response, status
+from fastapi import FastAPI, File, Depends, Response, Request, status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from tinydb import TinyDB, Query
@@ -262,6 +262,7 @@ async def register_node(
         version: str,
         description: str,
         platform: str,
+        request: Request,
         response: Response):
     """Registers a node to the server
 
@@ -271,6 +272,7 @@ async def register_node(
         version (str): Version string of currently running package
         description (str): Description of package
         platform: (str): Platform type (i.e. esp32)
+        request (Request): Starlette request object for getting client information
         response (Response): Starlette response object for setting return codes
 
     Returns:
@@ -304,7 +306,8 @@ async def register_node(
             "description": description,
             "platform": platform,
             "last_updated": -1,
-            "last_seen": round(time.time())
+            "last_seen": round(time.time()),
+            "ip_address": request.client.host
         }
         nodes.insert(entry)
         return {}
@@ -323,6 +326,7 @@ async def register_node(
     node_entry["package"] = package
     node_entry["description"] = description
     node_entry["platform"] = platform
+    node_entry["ip_address"] = request.client.host
 
     nodes.update(node_entry, query.node_id == node_id)
 
