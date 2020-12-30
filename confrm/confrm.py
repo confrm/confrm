@@ -13,6 +13,28 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
+Error Codes:
+
+    001 : "No versions found for package"
+    002 : "Package not found"
+    003 : "Package already exists"
+    004
+    005
+    006
+    007
+    008
+    009
+    010
+    011
+    012
+    013
+    014
+    015
+    016
+    017
+
+
 """
 
 import base64
@@ -465,7 +487,7 @@ async def add_package_version(
         file (bytes): File uploaded
     Returns:
         HTTP_201_CREATED if successful
-        HTTP_404_NOT_FOUNT if package is not found
+        HTTP_404_NOT_FOUND if package is not found
     """
 
     package_version_dict = package_version.__dict__
@@ -540,7 +562,7 @@ async def add_package_version(
             package_canaries.append(canary)
     if len(package_canaries) != 0:
         return {
-            "warning": "confrm-11",
+            "warning": "confrm-011",
             "msg": "Canaries are set for this package",
             "detail": "The package version was added, however canary nodes were identified"
             " as being configured for this package - unless manually cancelled those nodes"
@@ -829,19 +851,22 @@ async def put_config(type: str, key: str, value: str, response: Response, id: st
             f" pattern {pattern}"
         }
 
-    key_doc = config.get(query.key == key)
-    if key_doc is not None:
-        msg = "Config with key already exists"
-        logging.info(msg)
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return {
-            "error": "confrm-012",
-            "message": msg,
-            "detail": f"While attempting to add a new config with key \"{key}\" a key was"
-            " found to exist with the same name"
-        }
+    if type == "global":
+        key_doc = config.get((query.key == key) & (query.type == "global"))
+        if key_doc is not None:
+            key_doc["key"] = key
+            key_doc["value"] = value
+            config.update(key_doc, query.doc_id == key_doc.doc_id)
+        else:
+            config_doc = {
+                "type": type,
+                "id": id,
+                "key": key,
+                "value": value
+            }
+            config.insert(config_doc)
 
-    if type == "package":
+    elif type == "package":
         package_doc = packages.get(query.name == id)
         if package_doc is None:
             msg = "Package does not exist"
@@ -854,7 +879,24 @@ async def put_config(type: str, key: str, value: str, response: Response, id: st
                 " given does not match any existing packages"
             }
 
-    if type == "node":
+        key_doc = config.get((query.key == key) &
+                             (query.type == "package") &
+                             (query.id == id))
+        if key_doc is not None:
+            key_doc["key"] = key
+            key_doc["value"] = value
+            config.update(key_doc, query.doc_id == key_doc.doc_id)
+        else:
+            config_doc = {
+                "type": type,
+                "id": id,
+                "key": key,
+                "value": value
+            }
+            config.insert(config_doc)
+
+    elif type == "node":
+
         node_doc = nodes.get(query.node_id == id)
         if node_doc is None:
             msg = "Node does not exist"
@@ -867,13 +909,59 @@ async def put_config(type: str, key: str, value: str, response: Response, id: st
                 " match any known node_id"
             }
 
-    config_doc = {
-        "type": type,
-        "id": id,
-        "key": key,
-        "value": value
-    }
-
-    config.insert(config_doc)
+        key_doc = config.get((query.key == key) &
+                             (query.type == "node") &
+                             (query.node == id))
+        if key_doc is not None:
+            key_doc["key"] = key
+            key_doc["value"] = value
+            config.update(key_doc, query.doc_id == key_doc.doc_id)
+        else:
+            config_doc = {
+                "type": type,
+                "id": id,
+                "key": key,
+                "value": value
+            }
+            config.insert(config_doc)
 
     return {}
+
+
+@APP.get("/config/", status_code=status.HTTP_200_OK)
+async def get_config(key: str, response: Response, package: str = "", node_id: str = ""):
+
+    query = Query()
+    config = DB.table("config")
+
+    print(config.all())
+
+    if node_id:
+        doc = config.get((query.type == "node") &
+                         (query.id == node_id) &
+                         (query.key == key))
+        if doc is not None:
+            return {"value": doc["value"]}
+
+    if package:
+        doc = config.get((query.type == "package") &
+                         (query.id == package) &
+                         (query.key == key))
+        if doc is not None:
+            return {"value": doc["value"]}
+
+    # Must be global...
+    doc = config.get((query.type == "global") &
+                     (query.key == key))
+    if doc is None:
+        msg = "Key not found"
+        logging.info(msg)
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return {
+            "error": "confrm-012",
+            "message": msg,
+            "detail": f"Key \"{key}\" was not found for package \"{package}\""
+            " / node \"{node_id}\""
+        }
+
+    return {"value": doc["value"]}
