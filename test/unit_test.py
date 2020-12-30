@@ -332,6 +332,56 @@ def test_put_node_package():
             assert response.json()["current_version"] == "0.2.0"
             assert response.json()["force"]
 
+            # Put in a newer package versions for the packages, set as active
+            # should have no effect on the canary - but might generate a warning
+            # message
+            with open(test_file, "rb") as file_ptr:
+                response = client.post("/package_version/" +
+                                       "?name=package_a" +
+                                       "&major=0" +
+                                       "&minor=1" +
+                                       "&revision=1" +
+                                       "&set_active=true",
+                                       files={"file": ("filename", file_ptr, "application/binary")})
+                assert response.status_code == 201
+
+            with open(test_file, "rb") as file_ptr:
+                response = client.post("/package_version/" +
+                                       "?name=package_b" +
+                                       "&major=0" +
+                                       "&minor=2" +
+                                       "&revision=1" +
+                                       "&set_active=true",
+                                       files={"file": ("filename", file_ptr, "application/binary")})
+                assert response.status_code == 201
+                assert response.json()["warning"] == "confrm-11"
+
+            # Check for update (will be a force to package_b with version 0.2.0)
+            response = client.get("/check_for_update/" +
+                                  "?node_id=0:12:3:4" +
+                                  "&name=package_a")
+            assert response.status_code == 200
+            assert response.json()["current_version"] == "0.2.0"
+            assert response.json()["force"]
+
+            # Re-Register a node with confrm using the forced package
+            # this should reset the tag forcing the version
+            response = client.put("/register_node/" +
+                                  "?node_id=0:12:3:4" +
+                                  "&package=package_b" +
+                                  "&version=0.2.0" +
+                                  "&description=some%20description" +
+                                  "&platform=esp32")
+            assert response.status_code == 200
+
+            # Check for update (will be a package with version 0.2.1)
+            response = client.get("/check_for_update/" +
+                                  "?node_id=0:12:3:4" +
+                                  "&name=package_b")
+            assert response.status_code == 200
+            assert response.json()["current_version"] == "0.2.0"
+            assert not response.json()["force"]
+
 # register_node
 # nodes
 # packages
