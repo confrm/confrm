@@ -409,6 +409,7 @@ def test_config():
                                   "&version=0.2.0" +
                                   "&description=some%20description" +
                                   "&platform=esp32")
+            assert response.status_code == 200
 
             # Add a new global config
             response = client.put("/config/" +
@@ -436,12 +437,12 @@ def test_config():
 
             # Test for duplicate key name (key_b, different type)
             response = client.put("/config/" +
-                                   "?type=" +
+                                   "?type=global" +
                                    "&id=package_a" +
                                    "&key=key_b"
                                    "&value=value_b")
             assert response.status_code == 400
-            assert response.json()["error"] == "confrm-12"
+            assert response.json()["error"] == "confrm-012"
 
             # Test for non-existing package
             response = client.put("/config/" +
@@ -450,7 +451,7 @@ def test_config():
                                    "&key=key_z"
                                    "&value=value_b")
             assert response.status_code == 400
-            assert response.json()["error"] == "confrm-13"
+            assert response.json()["error"] == "confrm-013"
 
             # Test for non-existing node
             response = client.put("/config/" +
@@ -459,5 +460,31 @@ def test_config():
                                    "&key=key_x"
                                    "&value=value_x")
             assert response.status_code == 400
-            assert response.json()["error"] == "confrm-14"
+            assert response.json()["error"] == "confrm-014"
 
+            # Test for no type given
+            response = client.put("/config/" +
+                                   "?type=" +
+                                   "&id=package_a" +
+                                   "&key=key_b"
+                                   "&value=value_b")
+            assert response.status_code == 400
+            assert response.json()["error"] == "confrm-015"
+
+            # Test incorrect type give (same error number as empty)
+            response = client.put("/config/" +
+                                   "?type=thing" +
+                                   "&id=package_a" +
+                                   "&key=key_b"
+                                   "&value=value_b")
+            assert response.status_code == 400
+            assert response.json()["error"] == "confrm-015"
+
+            # Test key containing incorrect charachters
+            response = client.put("/config/" +
+                                   "?type=thing" +
+                                   "&id=package_a" +
+                                   "&key=key%20b"
+                                   "&value=value_b")
+            assert response.status_code == 400
+            assert response.json()["error"] == "confrm-015"

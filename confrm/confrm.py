@@ -784,3 +784,96 @@ async def get_blob(name: str, blob: str):
         return
 
     return ConfrmFileResponse(data)
+
+
+@APP.put("/config/", status_code=status.HTTP_201_CREATED)
+async def put_config(type: str, key: str, value: str, response: Response, id: str = ""):
+    """Adds new config to the config database
+
+    Attributes:
+        type (str): One of global, package or node
+        id (str): Empty, package name or node_id
+        key (str): Key to be stored
+        value (str): Value to be stored
+    """
+
+    query = Query()
+    config = DB.table("config")
+    packages = DB.table("packages")
+    nodes = DB.table("nodes")
+
+    types = ["global", "package", "node"]
+
+    if not type or type not in types:
+        msg = "Type cannot be empty and must be a valid type"
+        logging.info(msg)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {
+            "error": "confrm-015",
+            "message": msg,
+            "detail": "While attempting to add a new config the type of config given was empty"
+            " or was incorrect."
+        }
+
+    pattern = '^[0-9a-zA-Z_-]+$'
+    regex = re.compile(pattern)
+
+    if regex.match(key) is None:
+        msg = f"Key name does not match pattern {pattern}"
+        logging.info(msg)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {
+            "error": "confrm-016",
+            "message": msg,
+            "detail": "While attempting to add a new config the key given did not match the"
+            f" pattern {pattern}"
+        }
+
+    key_doc = config.get(query.key == key)
+    if key_doc is not None:
+        msg = "Config with key already exists"
+        logging.info(msg)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {
+            "error": "confrm-012",
+            "message": msg,
+            "detail": f"While attempting to add a new config with key \"{key}\" a key was"
+            " found to exist with the same name"
+        }
+
+    if type == "package":
+        package_doc = packages.get(query.name == id)
+        if package_doc is None:
+            msg = "Package does not exist"
+            logging.info(msg)
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return {
+                "error": "confrm-013",
+                "message": msg,
+                "detail": "While attempting to add a new config for a package the package name "
+                " given does not match any existing packages"
+            }
+
+    if type == "node":
+        node_doc = nodes.get(query.node_id == id)
+        if node_doc is None:
+            msg = "Node does not exist"
+            logging.info(msg)
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return {
+                "error": "confrm-014",
+                "message": msg,
+                "detail": "While attempting to add a new config for a node the node_id does not "
+                " match any known node_id"
+            }
+
+    config_doc = {
+        "type": type,
+        "id": id,
+        "key": key,
+        "value": value
+    }
+
+    config.insert(config_doc)
+
+    return {}
