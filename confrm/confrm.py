@@ -31,6 +31,7 @@ from fastapi import FastAPI, File, Depends, Response, Request, status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from tinydb import TinyDB, Query
+from tinydb.operations import delete
 from markupsafe import escape
 from pydantic import BaseModel  # pylint: disable=E0611
 
@@ -292,13 +293,13 @@ async def register_node(
     description = escape(description)
     platform = escape(platform)
 
-    package_entry = packages.get(query.name == package)
-    if package_entry is None:
+    package_doc = packages.get(query.name == package)
+    if package_doc is None:
         response.status_code = status.HTTP_404_NOT_FOUND
-        return {"info": "Unknown package name"}
+        return {"info": "Unknown package name"}  # TODO: Set errorno
 
-    node_entry = nodes.get(query.node_id == node_id)
-    if node_entry is None:
+    node_doc = nodes.get(query.node_id == node_id)
+    if node_doc is None:
         entry = {
             "node_id": node_id,
             "package": package,
@@ -314,21 +315,26 @@ async def register_node(
 
     # Update the package entry based on package name change, new version of a package
     # and register this as the last update time
-    if node_entry["package"] != package:  # Package changed
-        node_entry["package"] = package
-        node_entry["version"] = version
-        node_entry["last_updated"] = -1
-    elif node_entry["version"] != version:  # Version of package changed
-        node_entry["version"] = version
-        node_entry["last_updated"] = round(time.time())
-    node_entry["last_seen"] = round(time.time())
+    if node_doc["package"] != package:  # Package changed
+        node_doc["package"] = package
+        node_doc["version"] = version
+        node_doc["last_updated"] = -1
+    elif node_doc["version"] != version:  # Version of package changed
+        node_doc["version"] = version
+        node_doc["last_updated"] = round(time.time())
+    node_doc["last_seen"] = round(time.time())
 
-    node_entry["package"] = package
-    node_entry["description"] = description
-    node_entry["platform"] = platform
-    node_entry["ip_address"] = request.client.host
+    node_doc["package"] = package
+    node_doc["description"] = description
+    node_doc["platform"] = platform
+    node_doc["ip_address"] = request.client.host
 
-    nodes.update(node_entry, query.node_id == node_id)
+    nodes.update(node_doc, query.node_id == node_id)
+
+    # Check to see if a canary
+    if "canary" in node_doc.keys():
+        if node_doc["canary"]["package"] == package and node_doc["canary"]["version"] == version:
+            nodes.update(delete("canary"), query.node_id == node_id)
 
     return {}
 
@@ -526,6 +532,21 @@ async def add_package_version(
         package["current_version"] = version
         packages.update(package, query.name == package["name"])
 
+    nodes = DB.table("nodes")
+    canaries = nodes.search(query.canary != "")
+    package_canaries = []
+    for canary in canaries:
+        if canary["canary"]["package"] == package_version_dict["name"]:
+            package_canaries.append(canary)
+    if len(package_canaries) != 0:
+        return {
+            "warning": "confrm-11",
+            "msg": "Canaries are set for this package",
+            "detail": "The package version was added, however canary nodes were identified"
+            " as being configured for this package - unless manually cancelled those nodes"
+            " will update to the canary configuration"
+        }
+
     return {}
 
 
@@ -615,17 +636,15 @@ async def check_for_update(name: str, node_id: str, response: Response):
         # Check to see if there is a canary entry for this node
         node = nodes.get(query.node_id == node_id)
         if node is not None:
+            print(node)
             if "canary" in node.keys():
-                version_entry = get_package_version_by_version_string(
+                version_doc = get_package_version_by_version_string(
                     node["canary"]["package"],
                     node["canary"]["version"])
-                # TODO: Refector for getting package by name
-                canary_package = packages.get(
-                    query.name == node["canary"]["package"])
                 return {
-                    "current_version": canary_package["current_version"],
-                    "blob": version_entry["blob_id"],
-                    "hash": version_entry["hash"],
+                    "current_version": node["canary"]["version"],
+                    "blob": version_doc["blob_id"],
+                    "hash": version_doc["hash"],
                     "force": True
                 }
 

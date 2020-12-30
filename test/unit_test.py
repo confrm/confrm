@@ -379,7 +379,7 @@ def test_put_node_package():
                                   "?node_id=0:12:3:4" +
                                   "&name=package_b")
             assert response.status_code == 200
-            assert response.json()["current_version"] == "0.2.0"
+            assert response.json()["current_version"] == "0.2.1"
             assert not response.json()["force"]
 
 # register_node
