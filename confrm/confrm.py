@@ -33,6 +33,7 @@ Error Codes:
     015
     016
     017 : Version numbers cannot be negative
+    018 : PUT /node_package/ Package version not found
 
 
 """
@@ -750,16 +751,32 @@ async def node_package(node_id: str, package: str, response: Response, version: 
             " name given was not found"
         }
 
-    if not package_doc["current_version"]:
-        msg = "Package has no active version"
-        logging.info(msg)
-        response.status_code = status.HTTP_404_NOT_FOUND
-        return {
-            "error": "confrm-008",
-            "message": msg,
-            "detail": "While attempting to set a node to use a particular package the package" +
-            " was found to have no active versions"
-        }
+    if not version:
+        if not package_doc["current_version"]:
+            msg = "Package has no active version"
+            logging.info(msg)
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return {
+                "error": "confrm-008",
+                "message": msg,
+                "detail": "While attempting to set a node to use a particular package the package" +
+                " was found to have no active versions and no specific version was given"
+            }
+        version = package_doc["current_version"]
+    else:
+        version_doc = get_package_version_by_version_string(package, version)
+        if version_doc is None:
+            msg = "Package version not found"
+            logging.info(msg)
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return {
+                "error": "confrm-018",
+                "message": msg,
+                "detail": "While attempting to set a node to use a particular package the " +
+                " version given was not found"
+            }
+
+
 
     node_doc = nodes.get(query.node_id == node_id)
     if node_doc is None:
@@ -775,7 +792,7 @@ async def node_package(node_id: str, package: str, response: Response, version: 
 
     node_doc["canary"] = {
         "package": package,
-        "version": package_doc["current_version"]
+        "version": version
     }
     nodes.update(node_doc, query.node_id == node_id)
 
@@ -940,6 +957,15 @@ async def put_config(type: str, key: str, value: str, response: Response, id: st
 
 @APP.get("/config/", status_code=status.HTTP_200_OK)
 async def get_config(key: str, response: Response, package: str = "", node_id: str = ""):
+    """Get configuration value from database
+
+    Attributes:
+
+        key (str): Key to retrieve
+        response (Response): Starlette response object
+        package (str): Package of requesting node
+        node_id (str): node_id of requesting node
+    """
 
     query = Query()
     config = DB.table("config")

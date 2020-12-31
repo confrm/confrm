@@ -394,6 +394,22 @@ def test_put_node_package():
             assert response.json()["current_version"] == "0.2.1"
             assert not response.json()["force"]
 
+            # Force to use different package, non-existing version
+            response = client.put("/node_package/" +
+                                  "?node_id=0:12:3:4" +
+                                  "&package=package_b" +
+                                  "&version=1.0.0")
+            assert response.status_code == 404
+            assert response.json()["error"] == "confrm-018"
+
+            # Force to use different package, existing version
+            response = client.put("/node_package/" +
+                                  "?node_id=0:12:3:4" +
+                                  "&package=package_b" +
+                                  "&version=0.2.0")
+            assert response.status_code == 200
+
+
 
 def test_config():
     """Tests config functions"""
