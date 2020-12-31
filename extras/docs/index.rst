@@ -1,9 +1,12 @@
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
+   :hidden:
    :numbered:
 
-   installation.rst
-   developer/databases.rst
+   installation
+   user_guide
+   compiling
+   databases
 
 .. include:: ../../README.rst
    :end-before: ----
