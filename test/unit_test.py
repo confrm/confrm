@@ -249,6 +249,18 @@ def test_post_package_version():
                 assert response.status_code == 400
                 assert response.json()["error"] == "confrm-006"
 
+            # Negative version number
+            with open(test_file, "rb") as file_ptr:
+                response = client.post("/package_version/" +
+                                       "?name=test_package" +
+                                       "&major=-1" +
+                                       "&minor=2" +
+                                       "&revision=4" +
+                                       "&set_active=true",
+                                       files={"file": ("filename", file_ptr, "application/binary")})
+                assert response.status_code == 400
+                assert response.json()["error"] == "confrm-017"
+
 
 def test_put_node_package():
     """Tests changing the package for a given node"""

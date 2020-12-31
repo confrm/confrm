@@ -32,7 +32,7 @@ Error Codes:
     014
     015
     016
-    017
+    017 : Version numbers cannot be negative
 
 
 """
@@ -522,6 +522,18 @@ async def add_package_version(
             "detail": "While attempting to add a new package version the version given " +
             " was found to be already used"
         }
+
+    if package_version_dict["major"] < 0 or package_version_dict["minor"] < 0 or package_version_dict["revision"] < 0:
+        msg = "Version number elements cannot be negative"
+        logging.info(msg)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {
+            "error": "confrm-017",
+            "message": msg,
+            "detail": "While attempting to add a new package version the version given " +
+            " was found to contain negative numbers"
+        }
+        
 
     # Package was uploaded, create hash of binary
     _h = SHA256.new()
