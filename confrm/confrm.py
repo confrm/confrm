@@ -14,7 +14,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-Error Codes:
+Codes:
 
     001 : "No versions found for package"
     002 : "Package not found"
@@ -32,8 +32,15 @@ Error Codes:
     014
     015
     016
-    017 : Version numbers cannot be negative
-    018 : PUT /node_package/ Package version not found
+    017  Version numbers cannot be negative
+    018 ERROR    PUT       /node_package/      Package version not found
+    019 ERROR    DELETE    /package_version/   Package not found
+    020 ERROR    DELETE    /package_version/   Package version not found
+    021 WARNING  DELETE    /package_version/   Active version not set
+    022
+    023
+    024
+    025
 
 
 """
@@ -533,8 +540,7 @@ async def add_package_version(
             "message": msg,
             "detail": "While attempting to add a new package version the version given " +
             " was found to contain negative numbers"
-        }
-        
+        } 
 
     # Package was uploaded, create hash of binary
     _h = SHA256.new()
@@ -584,33 +590,64 @@ async def add_package_version(
     return {}
 
 
-@APP.delete("/package_version/")
-async def del_package_version(name: str, version: str):
-    """ Delete a version """
-    if CONFIG is None:
-        do_config()
+@APP.delete("/package_version/", status_code = status.HTTP_200_OK)
+async def del_package_version(package: str, version: str, response: Response):
+    """ Delete a package version 
+
+        Attributes:
+
+            package (str): Package with verion to be deleted
+            version (str): Version to be deleted
+            response (Response): Starlette response object
+    """
 
     packages = DB.table("packages")
     query = Query()
 
-    package = packages.get(query.name == name)
-    if package is not None:
-        if "current_version" in package.keys():
-            if version == package["current_version"]:
-                return {"ok": False}
+    package_doc = packages.get(query.name == package)
+    if package_doc is None:
+        msg = "Package not found"
+        logging.info(msg)
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return {
+            "error": "confrm-019",
+            "message": msg,
+            "detail": "While attempting to delete a package version the package specified" +
+            " was not found"
+        }
 
     package_versions = DB.table("package_versions")
-    version_entry = get_package_version_by_version_string(name, version)
+    version_entry = get_package_version_by_version_string(package, version)
 
     if version_entry is None:
-        return {"ok": False}
+        msg = "Package version not found"
+        logging.info(msg)
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return {
+            "error": "confrm-020",
+            "message": msg,
+            "detail": "While attempting to delete a package version the version specified" +
+            " was not found"
+        }
 
     package_versions.remove(doc_ids=[version_entry.doc_id])
     file_path = os.path.join(
         CONFIG["storage"]["data_dir"], version_entry["blob_id"])
     os.remove(file_path)
 
-    return {"ok": True}
+    if package_doc["current_version"] == version:
+        msg = "Active version is not set"
+        logging.info(msg)
+        response.status_code = status.HTTP_200_OK
+        return {
+                "warning": "confrm-021",
+            "message": msg,
+            "detail": "While deleting a package version the version specified was set as the"
+            " current active version. The package version was deleted and the active version "
+            f" for package {package} is now not set"
+        }
+
+    return {}
 
 
 @APP.get("/package/", status_code=status.HTTP_200_OK)

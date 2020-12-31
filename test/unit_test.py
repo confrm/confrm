@@ -172,6 +172,88 @@ def test_put_package():
             assert response.status_code == 400
 
 
+def test_delete_package_version():
+    """Tests deleting versions for a given package"""
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        config_file = os.path.join(data_dir, CONFIG_NAME)
+        with open(config_file, "w") as file:
+            file.write(get_config_file(data_dir))
+        os.environ["CONFRM_CONFIG"] = config_file
+
+        test_file_content = bytearray(os.urandom(1000))
+        test_file = os.path.join(data_dir, "test.bin")
+        with open(test_file, "wb") as file_ptr:
+            file_ptr.write(test_file_content)
+
+        with TestClient(APP) as client:
+
+            # Tests error generated when packages does not exist
+            response = client.delete("/package_version/" +
+                                     "?package=test_package" +
+                                     "&version=1.2.3")
+            assert response.status_code == 404
+
+            # Create a package to add versions to
+            response = client.put("/package/" +
+                                  "?name=test_package" +
+                                  "&description=some%20description" +
+                                  "&title=Good%20Name" +
+                                  "&platform=esp32")
+            assert response.status_code == 201
+
+            # Check files upload okay
+            with open(test_file, "rb") as file_ptr:
+                response = client.post("/package_version/" +
+                                       "?name=test_package" +
+                                       "&major=1" +
+                                       "&minor=2" +
+                                       "&revision=3",
+                                       files={"file": ("filename", file_ptr, "application/binary")})
+                assert response.status_code == 201
+
+            # Upload another version with active version set
+            with open(test_file, "rb") as file_ptr:
+                response = client.post("/package_version/" +
+                                       "?name=test_package" +
+                                       "&major=1" +
+                                       "&minor=2" +
+                                       "&revision=4" +
+                                       "&set_active=true",
+                                       files={"file": ("filename", file_ptr, "application/binary")})
+                assert response.status_code == 201
+
+            # Check both versions are there
+            response = client.get("/package/?name=test_package")
+            assert response.status_code == 200
+            assert next((item for item in response.json()[
+                        "versions"] if item["number"] == "1.2.3"), None) is not None
+            assert next((item for item in response.json()[
+                        "versions"] if item["number"] == "1.2.4"), None) is not None
+
+            # Delete one of the versions
+            response = client.delete("/package_version/" +
+                                     "?package=test_package" +
+                                     "&version=1.2.3")
+            assert response.status_code == 200
+
+            # Check only one version remains
+            response = client.get("/package/?name=test_package")
+            assert response.status_code == 200
+            assert next((item for item in response.json()[
+                "versions"] if item["number"] == "1.2.3"), None) is None
+            assert next((item for item in response.json()[
+                        "versions"] if item["number"] == "1.2.4"), None) is not None
+            assert "warning" not in response.json().keys()
+
+            # Delete the remaining version - check for warning as it was active
+            response = client.delete("/package_version/" +
+                                     "?package=test_package" +
+                                     "&version=1.2.4")
+            assert response.status_code == 200
+            assert response.json()["warning"] == "confrm-021"
+
+
 def test_post_package_version():
     """Tests adding versions for a given package"""
 
@@ -410,7 +492,6 @@ def test_put_node_package():
             assert response.status_code == 200
 
 
-
 def test_config():
     """Tests config functions"""
 
@@ -571,5 +652,3 @@ def test_config():
                                   "&node_id=1:12:3:4")
             assert response.status_code == 200
             assert response.json()["value"] == "value_node2"
-
-
