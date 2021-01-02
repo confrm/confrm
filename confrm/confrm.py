@@ -37,11 +37,14 @@ Codes:
     019 ERROR    DELETE    /package_version/   Package not found
     020 ERROR    DELETE    /package_version/   Package version not found
     021 WARNING  DELETE    /package_version/   Active version not set
-    022
-    023
+    022 ERROR    PUT       /node_title/        Node does not exist
+    023 ERROR    PUT       /node_title/        Node title is too long
     024
     025
-
+    026
+    027
+    028
+    029
 
 """
 
@@ -55,12 +58,13 @@ import uuid
 
 import toml
 
+from copy import deepcopy
 from Crypto.Hash import SHA256
 from fastapi import FastAPI, File, Depends, Response, Request, status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from tinydb import TinyDB, Query
-from tinydb.operations import delete
+from tinydb.operations import delete, set
 from markupsafe import escape
 from pydantic import BaseModel  # pylint: disable=E0611
 
@@ -145,24 +149,24 @@ def get_package_versions(name: str, package: {} = None):
     current_version = None
     for entry in versions_raw:
 
-        data_str = ""
+        date_str = ""
         if entry["date"] <= 0:
-            data_str = "Unknown"
+            date_str = "Unknown"
         else:
-            data_str = datetime.datetime.fromtimestamp(entry["date"])
+            date_str = datetime.datetime.fromtimestamp(entry["date"])
 
         version_str = f'{entry["major"]}.{entry["minor"]}.{entry["revision"]}'
         if "current_version" in package.keys() and \
                 version_str == package["current_version"]:
             current_version = {
                 "number": version_str,
-                "date": data_str,
+                "date": date_str,
                 "blob": entry["blob_id"]
             }
         else:
             versions.append({
                 "number": version_str,
-                "date": data_str,
+                "date": date_str,
                 "blob": entry["blob_id"]
             })
             versions = sorted(
@@ -338,6 +342,7 @@ async def register_node(
     if node_doc is None:
         entry = {
             "node_id": node_id,
+            "title": node_id,
             "package": package,
             "version": version,
             "description": description,
@@ -376,27 +381,39 @@ async def register_node(
 
 
 @APP.get("/nodes/", status_code=status.HTTP_200_OK)
-async def get_nodes(package: str = ""):
-    """Returns a list of nodes using a given package
+async def get_nodes(package: str = "", node_id: str = ""):
+    """Returns a list of nodes, if package is set the only return nodes using that package, if
+    a node is set then return the doc for that node.
 
     Attributes:
         package (str): name of package to return node list for
     """
 
+    query = Query()
     nodes = DB.table("nodes")
 
     node_list = []
-    if not package:
-        node_list = nodes.all()
-    else:
-        query = Query()
+    if package and node_id:
+        node_list = nodes.search((query.package == package) &
+                (query.node_id == node_id))
+    elif package:
         node_list = nodes.search(query.package == package)
+    elif node_id:
+        node_list = nodes.search(query.node_id == node_id)
+    else:
+        node_list = nodes.all()
 
     if len(node_list) == 0:
         return {}
 
+    # Make a new copy of list so we can make changes to elements for display layer without
+    # changing the values in the database
+    new_node_list = deepcopy(node_list)
+    node_list = new_node_list
+
     for node in node_list:
         if node["last_updated"] != -1:
+            print(node)
             value = datetime.datetime.fromtimestamp(node["last_updated"])
             node["last_updated"] = f"{value:%Y-%m-%d %H:%M:%S}"
         else:
@@ -407,7 +424,47 @@ async def get_nodes(package: str = ""):
         else:
             node["last_seen"] = "Unknown"
 
+    if not package and node_id:
+        return node_list[0]
     return node_list
+
+
+@APP.put("/node_title/", status_code=status.HTTP_200_OK)
+async def put_node_title(response: Response, node_id: str = "", title: str = ""):
+    """Sets the title of a node
+
+    Attributes:
+        package (str): name of package to return node list for
+    """
+
+    query = Query()
+    nodes = DB.table("nodes")
+
+    node_doc = nodes.get(query.node_id == node_id)
+    if node_doc is None:
+        msg = "Node does not exist"
+        logging.info(msg)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {
+            "error": "confrm-022",
+            "message": msg,
+            "detail": "While attempting to set the title of a node, the node id given was not"
+            " found"
+        }
+
+    if len(title) > 20:
+        msg = "Node title is too long"
+        logging.info(msg)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {
+            "error": "confrm-023",
+            "message": msg,
+            "detail": "While attempting to set the title of a node, the node id given was not"
+            " found"
+        }
+
+    nodes.update(set("title", title), query.node_id == node_id)
+    return {}
 
 
 @APP.get("/packages/")
