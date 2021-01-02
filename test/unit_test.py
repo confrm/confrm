@@ -652,3 +652,77 @@ def test_config():
                                   "&node_id=1:12:3:4")
             assert response.status_code == 200
             assert response.json()["value"] == "value_node2"
+
+
+def test_put_node_title():
+    """Tests changing the title of a given node"""
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        config_file = os.path.join(data_dir, CONFIG_NAME)
+        with open(config_file, "w") as file:
+            file.write(get_config_file(data_dir))
+        os.environ["CONFRM_CONFIG"] = config_file
+
+        with TestClient(APP) as client:
+
+            # Create a package for testing
+            response = client.put("/package/" +
+                                  "?name=package_a" +
+                                  "&description=some%20description" +
+                                  "&title=Good%20Name" +
+                                  "&platform=esp32")
+            assert response.status_code == 201
+
+            # Create a node
+            response = client.put("/register_node/" +
+                                  "?node_id=0:12:3:4" +
+                                  "&package=package_a" +
+                                  "&version=0.2.0" +
+                                  "&description=some%20description" +
+                                  "&platform=esp32")
+            assert response.status_code == 200
+
+            # Test default title is set to node id
+            response = client.get("/nodes/" +
+                                  "?node_id=0:12:3:4")
+            assert response.status_code == 200
+            assert response.json()["title"] == "0:12:3:4"
+
+            # Test the setting the title for a node that does not exist
+            response = client.put("/node_title/" +
+                                  "?node_id=1:12:3:4" +
+                                  "&title=Good%20Name")
+            assert response.status_code == 400
+            assert response.json()["error"] == "confrm-022"
+
+            # Test with no node set
+            response = client.put("/node_title/" +
+                                  "?node_id=" +
+                                  "&title=Good%20Name")
+            assert response.status_code == 400
+            assert response.json()["error"] == "confrm-022"
+
+            # Test the setting a node title to an incorrect name
+            response = client.put("/node_title/" +
+                                  "?node_id=0:12:3:4" +
+                                  "&title=Bad%20Name_that_is_very_much_far_too_long_and_should_be_rejected")
+            assert response.status_code == 400
+            assert response.json()["error"] == "confrm-023"
+
+            # Test default title is still set to node id
+            response = client.get("/nodes/" +
+                                  "?node_id=0:12:3:4")
+            assert response.status_code == 200
+            assert response.json()["title"] == "0:12:3:4"
+
+            # Change title to correct value
+            response = client.put("/node_title/" +
+                                  "?node_id=0:12:3:4" +
+                                  "&title=Good%20Name")
+            assert response.status_code == 200
+
+            # Check title was changed correctly
+            response = client.get("/nodes/" +
+                                  "?node_id=0:12:3:4")
+            assert response.status_code == 200
+            assert response.json()["title"] == "Good Name"
