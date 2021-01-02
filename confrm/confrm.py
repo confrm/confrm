@@ -592,11 +592,11 @@ async def add_package_version(
 
 @APP.delete("/package_version/", status_code = status.HTTP_200_OK)
 async def del_package_version(package: str, version: str, response: Response):
-    """ Delete a package version 
+    """ Delete a package version
 
         Attributes:
 
-            package (str): Package with verion to be deleted
+            package (str): Package with version to be deleted
             version (str): Version to be deleted
             response (Response): Starlette response object
     """
@@ -1033,6 +1033,6 @@ async def get_config(key: str, response: Response, package: str = "", node_id: s
             "message": msg,
             "detail": f"Key \"{key}\" was not found for package \"{package}\""
             " / node \"{node_id}\""
-        }
+            }
 
     return {"value": doc["value"]}

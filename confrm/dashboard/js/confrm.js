@@ -3,10 +3,6 @@ document.addEventListener("DOMContentLoaded", function () {
   // Handler when all assets (including images) are loaded
   let nav_elements = [
     {
-      "name": "Dashboard",
-      "icon": "gg-organisation",
-    },
-    {
       "name": "Packages",
       "icon": "gg-album",
       "templates": ["packages.html"]
@@ -15,6 +11,11 @@ document.addEventListener("DOMContentLoaded", function () {
       "name": "Nodes",
       "icon": "gg-smartphone-ram",
       "templates": ["nodes.html"]
+    },
+    {
+      "name": "Configuration",
+      "icon": "gg-file-document",
+      "templates": []
     },
   ];
 
@@ -82,6 +83,10 @@ document.addEventListener("DOMContentLoaded", function () {
     updateMeta(meta);
     showPage(page_name);
   });
+
+  setTimeout(function() {
+    showPage("packages");
+  }, 200);
 
   function drawHelper(name, body) {
     return { [name](...args) { return body(...args) } }[name];
@@ -700,7 +705,6 @@ document.addEventListener("DOMContentLoaded", function () {
       updateNodesTable();
     }
   }
-  
 
 });
 
