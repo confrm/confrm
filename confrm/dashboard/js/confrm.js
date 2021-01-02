@@ -35,8 +35,9 @@ document.addEventListener("DOMContentLoaded", function () {
   // For messaging to form elements
   var active_package = "";
 
-  // For storing which nodes have been drawn for the nodes pages
+  // For storing which up elements have been drawn
   drawn_nodes = [];
+  drawn_packages = [];
 
   // Call the update function every 1200ms
   setInterval(updateUIEvent, 1200);
@@ -84,7 +85,8 @@ document.addEventListener("DOMContentLoaded", function () {
     showPage(page_name);
   });
 
-  setTimeout(function() {
+  setTimeout(function () {
+    current_page = "packages";
     showPage("packages");
   }, 200);
 
@@ -98,6 +100,120 @@ document.addEventListener("DOMContentLoaded", function () {
 
     $("#packages-table-title").html(meta["packages"] + " Packages Installed");
 
+    drawn_packages = [];
+
+    updatePackagesTable();
+
+  }));
+
+
+  pages.push(drawHelper("nodes", () => {
+
+    $("#page-content").html(templates["nodes"]["nodes.html"]);
+
+    $("#node-table-title").html(meta["nodes"] + " Nodes Registered");
+
+    // This list is used to track which nodes are currently drawn on the screen.
+    // As this method is being called we can assume that this should be cleared
+    // pending an update when updateNodeTables is called.
+    drawn_nodes = [];
+
+    updateNodesTable();
+
+  }));
+
+
+  function setPackageVersionsModal(name) {
+    let data = $.ajax({
+      url: "/package/?name=" + name,
+      type: "GET"
+    }).then(function (data) {
+      let title = data["title"];
+      let body = `
+        <table class="table card-table table-vcenter text-nowrap datatable">
+          <thead>
+            <tr>
+              <th>Version</th>
+              <th>Date</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="packages-table-body">
+      `;
+
+      for (let ver in data["versions"]) {
+
+        let is_active = data["versions"][ver].number === data["current_version"];
+        let number = data["versions"][ver].number;
+        let date = data["versions"][ver].date
+        let name = data["name"];
+
+        body += `
+          <tr>
+            <td>` + number + `</td>
+            <td>` + date + `</td>
+            <td class="text-end" align="right">
+            <span class="dropdown">
+              <button class="btn dropdown-toggle align-text-top" data-bs-boundary="viewport"
+                data-bs-toggle="dropdown">Actions</button>
+              <div class="dropdown-menu dropdown-menu-end style="cursor:pointer">
+                <div class="dropdown-item packages-delete-version" data-version="` + number + `" 
+                data-package-name="` + name + `">
+                  Delete Version
+                </div>
+        `;
+        if (false === is_active) {
+          body += `
+            <div class="dropdown-item packages-set-active" data-version="` + number + `" 
+            data-package-name="` + name + `" style="cursor:pointer">
+            Set as Active
+            </div>`;
+        }
+        body += `
+              </div>
+            </span>
+            </td>
+          </tr>
+        `
+      }
+
+      body += `
+          </tbody>
+        </table>`;
+
+      $("#modal-package-info .modal-title").html(title);
+      $("#modal-package-info .modal-body").html(body);
+
+      $('.packages-set-active').unbind("click");
+      $('.packages-set-active').click(function (sender) {
+        let package = sender.currentTarget.dataset.packageName;
+        let version = sender.currentTarget.dataset.version;
+        let data = $.ajax({
+          url: "/set_active_version/?name=" + name + "&version=" + version,
+          type: "PUT"
+        }).then(function (data) {
+          setPackageVersionsModal(name);
+        });
+      });
+
+      $('.packages-delete-version').unbind("click");
+      $('.packages-delete-version').click(function (sender) {
+        let package = sender.currentTarget.dataset.packageName;
+        let version = sender.currentTarget.dataset.version;
+        let data = $.ajax({
+          url: "/package_version/?name=" + name + "&version=" + version,
+          type: "DELETE"
+        }).then(function (data) {
+          setPackageVersionsModal(name);
+        });
+      });
+
+    });
+  }
+
+
+
+  function updatePackagesTable() {
     let data = $.ajax({
       url: "/packages/",
       type: "GET"
@@ -107,58 +223,92 @@ document.addEventListener("DOMContentLoaded", function () {
 
       for (let entry in data) {
         let row = data[entry];
-        // Version is a list, process to first element + info mark
-        let version = "", manage_versions = "";
-        if (row["versions"].length == 0) {
-          manage_versions = "disabled";
-          version = "None";
-        } else if (row["versions"].length == 1) {
-          version = row["versions"][0].number;
-        } else if (row["versions"].length > 1) {
-          version = row["versions"][0].number +
-            `&nbsp;
-            <svg class="icon packages-info-button" style="cursor:pointer" width="24" height="24" viewBox="0 0 24 24"
-            data-bs-toggle="modal" data-bs-target="#modal-package-info" data-package-name="` + entry + `">
-              <use xlink:href="/static/img/all.svg#gg-info"/>
-            </svg>`;
-        }
-        html += "<tr>";
-        html += `<td>` + row["title"] + ` <span class="text-muted">(` + entry + `)</span></td>`;
-        html += `<td>` + row["description"] + `</td>`;
-        html += `<td>` + `ENABLED</td>`;
-        html += `<td>` + version + `</td>`;
-        html += `<td>` + row["platform"] + `</td>`;
-        html += `
-          <td class="text-end">
-            <span class="dropdown">
 
-              <button class="btn dropdown-toggle align-text-top"  data-bs-boundary="viewport"
-                data-bs-toggle="dropdown">Actions</button>
-              <div class="dropdown-menu dropdown-menu-end">
-                <div class="dropdown-item packages-action-upload" style="cursor:pointer" 
-                  data-bs-toggle="modal" data-bs-target="#modal-package-upload" data-package-name="` + entry + `"
-                  data-package-title="` + row.title + `" data-bs-backdrop="static" data-bs-keyboard="false">
-                  Upload new version
-                </div>
-                <div class="dropdown-item packages-info-button ` + manage_versions +`" style="cursor:pointer;" 
-                  data-bs-toggle="modal" data-bs-target="#modal-package-info" data-package-name="` + entry + `">
-                  Manage versions
-                </div>
-                <div class="dropdown-item packages-arduino-button" style="cursor:pointer;" data-package-name=` + entry + `>
-                  Enable ArduinoIDE Interface
-                </div>
-                <div class="dropdown-item packages-action-upload" style="cursor:pointer" data-package-name=` + entry + `>
-                  Delete package
-                </div>
-              </div>
-            </span>
-          </td>`;
-        html += "</tr>";
+        let is_drawn = false;
+        for (let package in drawn_packages) {
+          if (drawn_packages[package] === entry) {
+            is_drawn = true;
+          }
+        }
+
+        if (!is_drawn) {
+
+          // Version is a list, process to first element + info mark
+          let version = "", manage_versions = "";
+          if (row["versions"].length == 0) {
+            manage_versions = "disabled";
+            version = "None";
+          } else if (row["versions"].length == 1) {
+            version = row["versions"][0].number;
+          } else if (row["versions"].length > 1) {
+            version = row["versions"][0].number +
+              `&nbsp;
+                <svg class="icon packages-info-button" style="cursor:pointer" width="24" height="24" viewBox="0 0 24 24"
+                data-bs-toggle="modal" data-bs-target="#modal-package-info" data-package-name="` + entry + `">
+                  <use xlink:href="/static/img/all.svg#gg-info"/>
+                </svg>`;
+          }
+          html += `<tr id="package-` + entry + `">`;
+          html += `<td class="package-title">` + row["title"] + ` <span class="text-muted">(` + entry + `)</span></td>`;
+          html += `<td class="package-description">` + row["description"] + `</td>`;
+          html += `<td class="package-version">` + version + `</td>`;
+          html += `<td class="package-platform">` + row["platform"] + `</td>`;
+          html += `
+              <td class="text-end">
+                <span class="dropdown">
+
+                  <button class="btn dropdown-toggle align-text-top"  data-bs-boundary="viewport"
+                    data-bs-toggle="dropdown">Actions</button>
+                  <div class="dropdown-menu dropdown-menu-end">
+                    <div class="dropdown-item packages-action-upload" style="cursor:pointer" 
+                      data-bs-toggle="modal" data-bs-target="#modal-package-upload" data-package-name="` + entry + `"
+                      data-package-title="` + row.title + `" data-bs-backdrop="static" data-bs-keyboard="false">
+                      Upload new version
+                    </div>
+                    <div class="dropdown-item packages-info-button ` + manage_versions + `" style="cursor:pointer;" 
+                      data-bs-toggle="modal" data-bs-target="#modal-package-info" data-package-name="` + entry + `">
+                      Manage versions
+                    </div>
+                    <!--
+                    <div class="dropdown-item packages-arduino-button" style="cursor:pointer;" data-package-name=` + entry + `>
+                      Enable ArduinoIDE Interface
+                    </div>
+                    -->
+                    <div class="dropdown-item packages-action-upload" style="cursor:pointer" data-package-name=` + entry + `>
+                      Delete package
+                    </div>
+                  </div>
+                </span>
+              </td>`;
+          html += "</tr>";
+
+
+          $("#packages-table-body").append(html);
+          drawn_packages.push(entry);
+
+        } else {
+          let headings = ["title", "description", "version", "platform"];
+          let package_row_id = "#package-" + entry;
+          for (let heading in headings) {
+            let current = $(package_row_id + " .package-" + headings[heading]).html();
+            let element_type = typeof row[headings[heading]];
+            if ("number" === element_type) {
+              current = parseInt(current);
+            }
+            if ("title" === headings[heading]) {
+              let titleHtml = row["title"] + ` <span class="text-muted">(` + entry + `)</span>`;
+              if (current !== titleHtml) {
+                $(package_row_id + " .package-" + headings[heading]).html(titleHtml);
+              }
+            } else if (current !== row[headings[heading]]) {
+              $(package_row_id + " .package-" + headings[heading]).html(row[headings[heading]]);
+            }
+
+          }
+        }
       }
 
-      $("#packages-table-body").html(html);
-
-         $(".packages-info-button").unbind('click');
+      $(".packages-info-button").unbind('click');
       $(".packages-info-button").click(function (sender) {
         let name = sender.currentTarget.dataset.packageName;
         setPackageVersionsModal(name);
@@ -208,7 +358,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       $(".package-upload-submit").unbind("click");
       $(".package-upload-submit").click(function () {
-// TODO: get deployment method selected
+        // TODO: get deployment method selected
         let version_parts = $(".package-upload-version").find("input");
         let major = 0, minor = 0, revision = 0;
 
@@ -314,38 +464,38 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
             html += `
-              <label class="form-label">Canary Options</label>
-              <div class="form-selectgroup-boxes row mb-3 package-deploymnet-canary-options">
-                <div class="col-lg-6">
-                  <label class="form-selectgroup-item">
-                    <input type="radio" name="canary-type" value="next" class="form-selectgroup-input" checked>
-                    <span class="form-selectgroup-label d-flex align-items-center p-3">
-                      <span class="me-3">
-                        <span class="form-selectgroup-check"></span>
+                <label class="form-label">Canary Options</label>
+                <div class="form-selectgroup-boxes row mb-3 package-deploymnet-canary-options">
+                  <div class="col-lg-6">
+                    <label class="form-selectgroup-item">
+                      <input type="radio" name="canary-type" value="next" class="form-selectgroup-input" checked>
+                      <span class="form-selectgroup-label d-flex align-items-center p-3">
+                        <span class="me-3">
+                          <span class="form-selectgroup-check"></span>
+                        </span>
+                        <span class="form-selectgroup-label-content">
+                          <span class="form-selectgroup-title strong mb-1">Next Node</span>
+                          <span class="d-block text-muted">Update will be deployed to the next node that checks for updates.</span>
+                        </span>
                       </span>
-                      <span class="form-selectgroup-label-content">
-                        <span class="form-selectgroup-title strong mb-1">Next Node</span>
-                        <span class="d-block text-muted">Update will be deployed to the next node that checks for updates.</span>
+                    </label>
+                  </div>
+                  <div class="col-lg-6" class="package-deployment-canary-select">
+                    <label class="form-selectgroup-item">
+                      <input type="radio" name="canary-type" value="selected" class="form-selectgroup-input" ` + disabled + `>
+                      <span class="form-selectgroup-label d-flex align-items-center p-3">
+                        <span class="me-3">
+                          <span class="form-selectgroup-check"></span>
+                        </span>
+                        <span class="form-selectgroup-label-content">
+                          <span class="form-selectgroup-title strong mb-1">Specific Node</span>
+                          <span class="d-block text-muted">Nominate a node to be updated:</span>
+                          ` + options + `
+                        </span>
                       </span>
-                    </span>
-                  </label>
-                </div>
-                <div class="col-lg-6" class="package-deployment-canary-select">
-                  <label class="form-selectgroup-item">
-                    <input type="radio" name="canary-type" value="selected" class="form-selectgroup-input" ` + disabled + `>
-                    <span class="form-selectgroup-label d-flex align-items-center p-3">
-                      <span class="me-3">
-                        <span class="form-selectgroup-check"></span>
-                      </span>
-                      <span class="form-selectgroup-label-content">
-                        <span class="form-selectgroup-title strong mb-1">Specific Node</span>
-                        <span class="d-block text-muted">Nominate a node to be updated:</span>
-                        ` + options + `
-                      </span>
-                    </span>
-                  </label>
-                </div>
-              </div>`;
+                    </label>
+                  </div>
+                </div>`;
 
             html += `<strong>Note:</strong> You will need to manually set the active version to update remaining nodes.`;
 
@@ -374,7 +524,7 @@ document.addEventListener("DOMContentLoaded", function () {
       $(".package-add-submit").unbind("click");
       $(".package-add-submit").click(function () {
         let elements = $("#modal-package-add").find("input");
-        
+
         let name = "", title = "", description = "", platform = "";
 
         for (let element in elements) {
@@ -429,112 +579,7 @@ document.addEventListener("DOMContentLoaded", function () {
       });
 
     });
-
-  }));
-
-  function setPackageVersionsModal(name) {
-    let data = $.ajax({
-      url: "/package/?name=" + name,
-      type: "GET"
-    }).then(function (data) {
-      let title = data["title"];
-      let body = `
-        <table class="table card-table table-vcenter text-nowrap datatable">
-          <thead>
-            <tr>
-              <th>Version</th>
-              <th>Date</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="packages-table-body">
-      `;
-
-      for (let ver in data["versions"]) {
-
-        let is_active = data["versions"][ver].number === data["current_version"];
-        let number = data["versions"][ver].number;
-        let date = data["versions"][ver].date
-        let name = data["name"];
-
-        body += `
-          <tr>
-            <td>` + number + `</td>
-            <td>` + date + `</td>
-            <td class="text-end" align="right">
-            <span class="dropdown">
-              <button class="btn dropdown-toggle align-text-top" data-bs-boundary="viewport"
-                data-bs-toggle="dropdown">Actions</button>
-              <div class="dropdown-menu dropdown-menu-end style="cursor:pointer">
-                <div class="dropdown-item packages-delete-version" data-version="` + number + `" 
-                data-package-name="` + name + `">
-                  Delete Version
-                </div>
-        `;
-        if (false === is_active) {
-          body += `
-            <div class="dropdown-item packages-set-active" data-version="` + number + `" 
-            data-package-name="` + name + `" style="cursor:pointer">
-            Set as Active
-            </div>`;
-        }
-        body += `
-              </div>
-            </span>
-            </td>
-          </tr>
-        `
-      }
-
-      body += `
-          </tbody>
-        </table>`;
-
-      $("#modal-package-info .modal-title").html(title);
-      $("#modal-package-info .modal-body").html(body);
-
-      $('.packages-set-active').unbind("click");
-      $('.packages-set-active').click(function (sender) {
-        let package = sender.currentTarget.dataset.packageName;
-        let version = sender.currentTarget.dataset.version;
-        let data = $.ajax({
-          url: "/set_active_version/?name=" + name + "&version=" + version,
-          type: "PUT"
-        }).then(function (data) {
-          setPackageVersionsModal(name);
-        });
-      });
-
-      $('.packages-delete-version').unbind("click");
-      $('.packages-delete-version').click(function (sender) {
-        let package = sender.currentTarget.dataset.packageName;
-        let version = sender.currentTarget.dataset.version;
-        let data = $.ajax({
-          url: "/package_version/?name=" + name + "&version=" + version,
-          type: "DELETE"
-        }).then(function (data) {
-          setPackageVersionsModal(name);
-        });
-      });
-
-    });
   }
-
-
-  pages.push(drawHelper("nodes", () => {
-
-    $("#page-content").html(templates["nodes"]["nodes.html"]);
-  
-    $("#node-table-title").html(meta["nodes"] + " Nodes Registered");
-  
-    // This list is used to track which nodes are currently drawn on the screen.
-    // As this method is being called we can assume that this should be cleared
-    // pending an update when updateNodeTables is called.
-    drawn_nodes = [];
-
-    updateNodesTable();
-
-  }));
 
   function updateNodesTable() {
 
@@ -587,37 +632,10 @@ document.addEventListener("DOMContentLoaded", function () {
               </span>
             </td>`;
           html += "</tr>";
-          
+
           $("#nodes-table-body").append(html);
           drawn_nodes.push(row.node_id);
 
-          $('.nodes-change-button').unbind("click");
-          $('.nodes-change-button').click(function(sender) {
-            // Populate the modal 
-            let node_id = sender.currentTarget.dataset.nodeid;
-            let node_description = sender.currentTarget.dataset.description;
-            let current_package = sender.currentTarget.dataset.package;
-
-            $("#modal-node .modal-title").html("Change package (" + node_id + " - " + node_description + ")");
-
-            let data = $.ajax({
-              url: "/packages/",
-              type: "GET"
-            }).then(function (data) {
-              
-              let html = `<select class="form-select nodes-change-package-selection">`;
-              for (let package in data) {
-                html += `<option value="` + data[package].name + `"`;
-                if (data[package].name === current_package) {
-                  html += ` selected`;
-                }
-                html += `">` + data[package].title + ` (` + data[package].name + `)</option>`
-              }
-              html += `</option>`;
-              $("#modal-node .modal-body").html(html);
-            });
-
-          });
 
         } else {
           let headings = ["description", "package", "version", "platform", "last_seen", "last_updated"];
@@ -634,6 +652,35 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         }
       }
+
+      $('.nodes-change-button').unbind("click");
+      $('.nodes-change-button').click(function (sender) {
+        // Populate the modal 
+        let node_id = sender.currentTarget.dataset.nodeid;
+        let node_description = sender.currentTarget.dataset.description;
+        let current_package = sender.currentTarget.dataset.package;
+
+        $("#modal-node .modal-title").html("Change package (" + node_id + " - " + node_description + ")");
+
+        let data = $.ajax({
+          url: "/packages/",
+          type: "GET"
+        }).then(function (data) {
+
+          let html = `<select class="form-select nodes-change-package-selection">`;
+          for (let package in data) {
+            html += `<option value="` + data[package].name + `"`;
+            if (data[package].name === current_package) {
+              html += ` selected`;
+            }
+            html += `">` + data[package].title + ` (` + data[package].name + `)</option>`
+          }
+          html += `</option>`;
+          $("#modal-node .modal-body").html(html);
+        });
+
+      });
+
 
 
     });
@@ -673,7 +720,7 @@ document.addEventListener("DOMContentLoaded", function () {
     let current = $("#alerts").html();
     $("#alerts").html(html + current);
 
-// TODO: Once clicked the element should remove itself from the DOM properly
+    // TODO: Once clicked the element should remove itself from the DOM properly
   }
 
   function updateMeta(meta) {
@@ -701,8 +748,10 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function updateUIEvent() {
-    if ("nodes" == current_page) {
+    if ("nodes" === current_page) {
       updateNodesTable();
+    } else if ("packages" === current_page) {
+      updatePackagesTable();
     }
   }
 
