@@ -144,18 +144,25 @@ def get_package_versions(name: str, package: {} = None):
     versions = []
     current_version = None
     for entry in versions_raw:
+
+        data_str = ""
+        if entry["date"] <= 0:
+            data_str = "Unknown"
+        else:
+            data_str = datetime.datetime.fromtimestamp(entry["date"])
+
         version_str = f'{entry["major"]}.{entry["minor"]}.{entry["revision"]}'
         if "current_version" in package.keys() and \
                 version_str == package["current_version"]:
             current_version = {
                 "number": version_str,
-                "date": entry["date"],
+                "date": data_str,
                 "blob": entry["blob_id"]
             }
         else:
             versions.append({
                 "number": version_str,
-                "date": entry["date"],
+                "date": data_str,
                 "blob": entry["blob_id"]
             })
             versions = sorted(
