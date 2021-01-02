@@ -392,9 +392,13 @@ async def get_nodes(package: str = ""):
         if node["last_updated"] != -1:
             value = datetime.datetime.fromtimestamp(node["last_updated"])
             node["last_updated"] = f"{value:%Y-%m-%d %H:%M:%S}"
+        else:
+            node["last_updated"] = "Unknown"
         if node["last_seen"] != -1:
             value = datetime.datetime.fromtimestamp(node["last_seen"])
             node["last_seen"] = f"{value:%Y-%m-%d %H:%M:%S}"
+        else:
+            node["last_seen"] = "Unknown"
 
     return node_list
 
