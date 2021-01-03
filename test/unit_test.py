@@ -653,6 +653,28 @@ def test_config():
             assert response.status_code == 200
             assert response.json()["value"] == "value_node2"
 
+            # Test getting all config keys
+            response = client.get("/config/?key=")
+            assert response.status_code == 200
+            assert len(response.json()) > 0
+
+            # Change a config
+            response = client.put("/config/" +
+                                  "?type=node" +
+                                  "&id=1:12:3:4" +
+                                  "&key=key_a"
+                                  "&value=value_changed")
+            assert response.status_code == 201
+
+            # Test retrieving changed config key (node override)
+            response = client.get("/config/" +
+                                  "?key=key_a" +
+                                  "&package=package_a" +
+                                  "&node_id=1:12:3:4")
+            assert response.status_code == 200
+            assert response.json()["value"] == "value_changed"
+
+
 
 def test_put_node_title():
     """Tests changing the title of a given node"""

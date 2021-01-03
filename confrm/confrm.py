@@ -232,6 +232,53 @@ def get_package_version_by_version_string(package_name: str, version: str):
         (query.revision == int(parts[2])))
 
 
+def sort_configs(configs):
+    """Sort configs by global/package/node, then by package name, then by node name
+
+    Attributes:
+        configs (list): List of config dicts
+    """
+
+    result = []
+
+    # Find all unique keys and sort alphabetically
+    _keys = []
+    for config in configs:
+        if config["key"] not in _keys:
+            _keys.append(config["key"])
+    _keys = sorted(_keys, key=str.lower)
+
+    # For each key find globals, then packages, then nodes
+    for key in _keys:
+        _packages = []
+        _nodes = []
+        for config in configs:
+            if config["key"] == key:
+                if config["type"] == "global":
+                    result.append(config)
+                elif config["type"] == "package":
+                    _packages.append(config)
+                elif config["type"] == "node":
+                    _nodes.append(config)
+
+        # Sort the package end node elements alphabetically
+        _package_ids = sorted([_package["id"] for _package in _packages], key=str.lower)
+        for package in _package_ids:
+            for config in configs:
+                if config["key"] == key and config["type"] == "package" and config["id"] == package:
+                    result.append(config)
+                    break
+
+        _node_ids = sorted([_node["id"] for _node in _nodes], key=str.lower)
+        for node in _node_ids:
+            for config in configs:
+                if config["key"] == key and config["type"] == "node" and config["id"] == node:
+                    result.append(config)
+                    break
+
+    return result 
+
+
 # Files server in /static will point to ./dashboard (with respect to the running
 # script)
 APP.mount("/static",
@@ -413,7 +460,6 @@ async def get_nodes(package: str = "", node_id: str = ""):
 
     for node in node_list:
         if node["last_updated"] != -1:
-            print(node)
             value = datetime.datetime.fromtimestamp(node["last_updated"])
             node["last_updated"] = f"{value:%Y-%m-%d %H:%M:%S}"
         else:
@@ -452,7 +498,6 @@ async def put_node_title(response: Response, node_id: str = "", title: str = "")
             " found"
         }
 
-    print(title)
     title = escape(title)
 
     if len(title) > 80:
@@ -986,9 +1031,8 @@ async def put_config(type: str, key: str, value: str, response: Response, id: st
     if type == "global":
         key_doc = config.get((query.key == key) & (query.type == "global"))
         if key_doc is not None:
-            key_doc["key"] = key
-            key_doc["value"] = value
-            config.update(key_doc, query.doc_id == key_doc.doc_id)
+            config.update({"value": value}, doc_ids = [key_doc.doc_id])
+            #TODO: Warning for updating, including from and to values
         else:
             config_doc = {
                 "type": type,
@@ -1015,9 +1059,8 @@ async def put_config(type: str, key: str, value: str, response: Response, id: st
                              (query.type == "package") &
                              (query.id == id))
         if key_doc is not None:
-            key_doc["key"] = key
-            key_doc["value"] = value
-            config.update(key_doc, query.doc_id == key_doc.doc_id)
+            config.update({"value": value}, doc_ids = [key_doc.doc_id])
+            #TODO: Warning for updating, including from and to values
         else:
             config_doc = {
                 "type": type,
@@ -1043,11 +1086,11 @@ async def put_config(type: str, key: str, value: str, response: Response, id: st
 
         key_doc = config.get((query.key == key) &
                              (query.type == "node") &
-                             (query.node == id))
+                             (query.id == id))
+
         if key_doc is not None:
-            key_doc["key"] = key
-            key_doc["value"] = value
-            config.update(key_doc, query.doc_id == key_doc.doc_id)
+            config.update({"value": value}, doc_ids = [key_doc.doc_id])
+            #TODO: Warning for updating, including from and to values
         else:
             config_doc = {
                 "type": type,
@@ -1061,7 +1104,7 @@ async def put_config(type: str, key: str, value: str, response: Response, id: st
 
 
 @APP.get("/config/", status_code=status.HTTP_200_OK)
-async def get_config(key: str, response: Response, package: str = "", node_id: str = ""):
+async def get_config(response: Response, key: str = "", package: str = "", node_id: str = ""):
     """Get configuration value from database
 
     Attributes:
@@ -1088,6 +1131,9 @@ async def get_config(key: str, response: Response, package: str = "", node_id: s
                          (query.key == key))
         if doc is not None:
             return {"value": doc["value"]}
+
+    if not key:
+        return sort_configs(config.all())
 
     # Must be global...
     doc = config.get((query.type == "global") &

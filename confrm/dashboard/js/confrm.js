@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", function () {
     {
       "name": "Configuration",
       "icon": "gg-file-document",
-      "templates": []
+      "templates": ["configuration.html"]
     },
   ];
 
@@ -38,6 +38,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // For storing which up elements have been drawn
   drawn_nodes = [];
   drawn_packages = [];
+  drawn_configs = [];
 
   // Call the update function every 1200ms
   setInterval(updateUIEvent, 1200);
@@ -119,6 +120,20 @@ document.addEventListener("DOMContentLoaded", function () {
     drawn_nodes = [];
 
     updateNodesTable();
+
+  }));
+
+
+  pages.push(drawHelper("configuration", () => {
+
+    $("#page-content").html(templates["configuration"]["configuration.html"]);
+
+    // This list is used to track which nodes are currently drawn on the screen.
+    // As this method is being called we can assume that this should be cleared
+    // pending an update when updateNodeTables is called.
+    drawn_configs = [];
+
+    updateConfigsTable();
 
   }));
 
@@ -778,6 +793,344 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
   }
+
+
+  function updateConfigsTable() {
+
+    
+    $("#config-table-body").html("");
+
+    let data = $.ajax({
+      url: "/config/",
+      type: "GET"
+    }).then(function (data) {
+
+      for (let entry in data) {
+
+        let row = data[entry];
+
+        let html = "";
+        html += `<tr>`;
+        html += `<td class="config-key">` + row.key + `</td>`;
+        html += `<td class="config-type">` + row.type + `</td>`;
+        html += `<td class="config-id">` + row.id + `</td>`;
+        html += `<td class="config-value">` + row.value + `</td>`;
+        html += `
+          <td class="text-end">
+            <span class="dropdown">
+              <button class="btn dropdown-toggle align-text-top" data-bs-boundary="viewport"
+                data-bs-toggle="dropdown">Actions</button>
+              <div class="dropdown-menu dropdown-menu-end">
+                <div class="dropdown-item config-edit-button" style="cursor:pointer" 
+                  data-bs-toggle="modal" data-bs-target="#modal-config" data-key="` + row.key + `"
+                  data-id="` + row.id + `" data-type="` + row.type + `" data-value="` + row.value + `"
+                  data-bs-backdrop="static" data-bs-keyboard="false">
+                  Edit
+                </div>
+                <div class="dropdown-item config-delete-button" style="cursor:pointer" 
+                  data-bs-toggle="modal" data-bs-target="#modal-config-confirm" data-key="` + row.key + `"
+                  data-id="` + row.id + `" data-type="` + row.type + `" data-bs-backdrop="static"
+                  data-bs-keyboard="false">
+                  Delete
+                </div>
+              </div>
+            </span>
+          </td>`;
+        html += "</tr>";
+
+        $("#config-table-body").append(html);
+      }
+
+      /*
+       * Creates the node package change modal window
+       */
+      $('.config-edit-button').unbind("click");
+      $('.config-edit-button').click(function (sender) {
+
+        // Populate the modal 
+        let id = sender.currentTarget.dataset.id;
+        let key = sender.currentTarget.dataset.key;
+        let type = sender.currentTarget.dataset.type;
+        let value = sender.currentTarget.dataset.value;
+
+        $("#modal-config .modal-title").html("Edit Config");
+
+        let html = `
+              <div class="mb-3">
+                <label class="form-label">Key</label>
+                <input type="text" name="key" class="form-control" disabled="" value="` + key + `">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Type</label>
+                <input type="text" name="type" class="form-control" disabled="" value="` + type + `">
+              </div>
+        `;
+        
+        if ("global" !== type) {
+          html += `<div class="mb-3">`;
+        }
+
+        if ("package" === type) {
+          html += `<label class="form-label">Package</label>`;
+        } else if ("node" === type) {
+          html += `<label class="form-label">Node</label>`;
+        }
+
+        if ("global" !== type) {
+          html += `<input type="text" name="id" class="form-control" value="` + id + `" 
+            disabled=""></div>`;
+        }
+
+        html += `
+              <div class="mb-3">
+                <label class="form-label">Value</label>
+                <input type="text" name="title" class="form-control" value="` + value + `">
+              </div>
+        `;
+
+        $("#modal-config .modal-body").html(html);
+      });
+
+      /*
+       * Creates the node title setting modal window
+       */
+      $('.config-delete-button').unbind("click");
+      $('.config-delete-button').click(function (sender) {
+
+        // Populate the modal 
+        let id = sender.currentTarget.dataset.id;
+        let key = sender.currentTarget.dataset.key;
+        let type = sender.currentTarget.dataset.type;
+
+        let html = `Do you really want to delete config "` + key + `"`;
+
+        if ("global" === type) {
+          html += ` (global)`;
+        } else if ("package" === type) {
+          html += ` for package "` + id + `"`;
+        } else if ("node" === type) {
+          html += ` for node "` + id + `"`;
+        }
+
+        html += `? This cannot be undone.</div>`;
+
+        $("#modal-config-confirm .modal-question").html(html);
+
+      });
+
+
+      /*
+       * Handles the add button being pressed
+       */
+      $('.config-add-button').unbind('click');
+      $('.config-add-button').click(function (sender) {
+        let type = sender.currentTarget.dataset.type;
+
+        if ("global" === type) {
+          $("#modal-config-add .modal-title").html("Add global config");
+          let html = `
+              <div class="mb-3">
+                <label class="form-label">Key</label>
+                <input type="text" name="key" class="form-control" value="">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Value</label>
+                <input type="text" name="title" class="form-control" value="">
+              </div>
+          `;
+          html += ` <input type="hidden" name="type" value="global">`;
+          $("#modal-config-add .modal-body").html(html);
+        } else if ("package" === type) {
+          $("#modal-config-add .modal-title").html("Add package config");
+          let data = $.ajax({
+            url: "/packages/",
+            type: "GET"
+          }).then(function (data) {
+ 
+            let html = `
+              <div class="mb-3">
+                <label class="form-label">Package</label>
+                <select class="form-select" name="package">`;
+            for (let package in data) {
+              html += `<option value="` + data[package].name + `">` + data[package].title + ` (` + data[package].name + `)</option>`;
+            }
+            html += `
+                </select>
+              </div>`;
+
+            html += `
+              <div class="mb-3">
+                <label class="form-label">Key</label>
+                <input type="text" name="key" class="form-control" value="">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Value</label>
+                <input type="text" name="value" class="form-control" value="">
+              </div>
+            `;
+            html += ` <input type="hidden" name="type" value="package">`;
+ 
+            $("#modal-config-add .modal-body").html(html);
+          });
+        } else if ("node" === type) {
+          $("#modal-config-add .modal-title").html("Add package config");
+          let data = $.ajax({
+            url: "/nodes/",
+            type: "GET"
+          }).then(function (data) {
+ 
+            let html = `
+              <div class="mb-3">
+                <label class="form-label">Node</label>
+                <select class="form-select" name="node">`;
+            for (let node in data) {
+              html += `<option value="` + data[node].node_id + `">` + data[node].title + ` (` + data[node].node_id + `)</option>`;
+            }
+            html += `
+                </select>
+              </div>`;
+
+            html += `
+              <div class="mb-3">
+                <label class="form-label">Key</label>
+                <input type="text" name="key" class="form-control" value="">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Value</label>
+                <input type="text" name="value" class="form-control" value="">
+              </div>
+            `;
+            html += ` <input type="hidden" name="type" value="node">`;
+ 
+            $("#modal-config-add .modal-body").html(html);
+          });
+        }
+      });
+
+      /*
+       * Handle the user clicking add on the add config modal
+       */
+      $('.config-modal-add').unbind("click");
+      $('.config-modal-add').click(function (sender) {
+
+        let inputs = $("#modal-config-add .modal-body").find("input");
+        let type = "";
+        let value = "";
+        let key = "";
+        let package = "";
+        let node_id = "";
+
+        for (let input in inputs) {
+          switch (inputs[input].name) {
+            case "type":
+              type = inputs[input].value;
+              break;
+            case "value":
+              value = encodeURI(inputs[input].value);
+              break;
+            case "key":
+              key = inputs[input].value;
+              break;
+            default:
+              break;
+          }
+        }
+
+        inputs = $("#modal-config-add .modal-body").find("select");
+        for (let input in inputs) {
+          if (inputs[input].name === "package") {
+            package = inputs[input].value;
+          } else if (inputs[input].name === "node") {
+            node_id = inputs[input].value;
+          }
+        }
+
+        let id = "";
+        if ("package" === type) id = package;
+        else if ("node" === type) id = node_id;
+
+        let url = "/config/";
+        url += "?type=" + type;
+        url += "&key=" + key;
+        url += "&value=" + value;
+        if (type !== "global") {
+          url += "&id=" + id;
+        }
+
+        let data = $.ajax({
+          url: url,
+          type: "PUT"
+        }).fail(function (jqXHR, textStatus, errorThrown) {
+          let json = jqXHR.responseJSON;
+          addAlert(json.message, json.detail, "ERROR");
+          $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+        }).done(function (data, textStatus, jqXHR) {
+          $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+          updateConfigsTable();
+        });
+
+      });
+
+      /*
+       * Handle the user clicking submit on the general nodal for nodes
+       */
+      $('.nodes-modal-submit').unbind("click");
+      $('.nodes-modal-submit').click(function (sender) {
+
+        let inputs = $("#modal-node .modal-body").find("input");
+        let type = "";
+
+        for (let input in inputs) {
+          if ("type" === inputs[input].name) {
+            type = inputs[input].value;
+          }
+        }
+
+        switch(type) {
+          case "title":
+
+            let title = "", node_id = "";
+
+            for (let input in inputs) {
+              if ("node_id" === inputs[input].name) {
+                node_id = inputs[input].value;
+              } else if("title" === inputs[input].name) {
+                title = encodeURI(inputs[input].value);
+                title = title.replace(/#/g, '%23');
+              }
+            }
+
+            let url = "/node_title/";
+            url += "?node_id=" + node_id;
+            url += "&title=" + title;
+
+            let data = $.ajax({
+              url: url,
+              type: "PUT"
+            }).fail(function (jqXHR, textStatus, errorThrown) {
+              let json = jqXHR.responseJSON;
+              addAlert(json.message, json.detail, "ERROR");
+              $(".nodes-modal-submit").unbind("click");
+              $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+            }).done(function (data, textStatus, jqXHR) {
+              $(".nodes-modal-submit").unbind("click");
+              $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+            });
+
+            break;
+          case "platform":
+            break;
+          default:
+            break;
+        }
+
+      });
+
+
+    });
+
+  }
+
 
   function addAlert(message, detail, state) {
 
