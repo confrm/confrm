@@ -631,7 +631,8 @@ document.addEventListener("DOMContentLoaded", function () {
                     data-bs-toggle="modal" data-bs-target="#modal-package-info" data-package="` + entry + `">
                     Configure Variables
                   </div>
-                  <div class="dropdown-item nodes-delete-button" style="cursor:pointer" data-package=` + entry + `>
+                  <div class="dropdown-item nodes-delete-button" data-bs-target="#modal-node-confirm" style="cursor:pointer"
+                  data-bs-toggle="modal" data-nodeid="` + row.node_id + `">
                     Delete Node
                   </div>
                 </div>
@@ -675,7 +676,7 @@ document.addEventListener("DOMContentLoaded", function () {
         let node_title = sender.currentTarget.dataset.description;
         let current_package = sender.currentTarget.dataset.package;
 
-        $("#modal-node .modal-title").html("Change Package for node \"" + node_title + "\" (" + node_id + ")");
+        $("#modal-node .modal-title").html("Change Package for \"" + node_title + "\" (" + node_id + ")");
 
         let data = $.ajax({
           url: "/packages/",
@@ -706,7 +707,7 @@ document.addEventListener("DOMContentLoaded", function () {
         let node_id = sender.currentTarget.dataset.nodeid;
         let node_title = sender.currentTarget.dataset.title;
 
-        $("#modal-node .modal-title").html("Change Package for node \"" + node_title + "\" (" + node_id + ")");
+        $("#modal-node .modal-title").html("Change Title of \"" + node_title + "\" (" + node_id + ")");
 
         let html = `
           <label class="form-label">Node Title</label>
@@ -804,7 +805,6 @@ document.addEventListener("DOMContentLoaded", function () {
       <div class="btn-list">
         <a href="#" class="btn btn-success" data-bs-dismiss="alert">Okay</a>
       </div>
-      <a class="btn-close" data-bs-dismiss="alert" aria-label="close"></a>
       </div>
     `;
 
