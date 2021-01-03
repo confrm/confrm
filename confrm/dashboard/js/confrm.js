@@ -602,7 +602,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!is_drawn) {
           let html = "";
           html += `<tr id="node-` + row.node_id.replace(/:/g, "_") + `">`;
-          html += `<td>` + row.node_id + `</td>`;
+          html += `<td class="node-title">` + row.title + `  <span class="text-muted">(` + row.node_id + `)</span></td>`;
           html += `<td class="node-description">` + row.description + `</td>`;
           html += `<td class="node-package">` + row.package + `</td>`;
           html += `<td class="node-version">` + row.version + `</td>`;
@@ -615,9 +615,15 @@ document.addEventListener("DOMContentLoaded", function () {
                 <button class="btn dropdown-toggle align-text-top" data-bs-boundary="viewport"
                   data-bs-toggle="dropdown">Actions</button>
                 <div class="dropdown-menu dropdown-menu-end">
-                  <div class="dropdown-item nodes-change-button" style="cursor:pointer" 
+                  <div class="dropdown-item nodes-title-button" style="cursor:pointer" 
+                    data-bs-toggle="modal" data-bs-target="#modal-node"
+                    data-nodeid="` + row.node_id + `" data-title="` + row.title + `" data-bs-backdrop="static"
+                    data-bs-keyboard="false">
+                    Set Title
+                  </div>
+                  <div class="dropdown-item nodes-change-package-button" style="cursor:pointer" 
                     data-bs-toggle="modal" data-bs-target="#modal-node" data-package="` + entry + `"
-                    data-nodeid="` + row.node_id + `" data-description="` + row.description + `" data-bs-backdrop="static"
+                    data-nodeid="` + row.node_id + `" data-title="` + row.description + `" data-bs-backdrop="static"
                     data-bs-keyboard="false">
                     Change Package
                   </div>
@@ -638,7 +644,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
         } else {
-          let headings = ["description", "package", "version", "platform", "last_seen", "last_updated"];
+          let headings = ["title", "description", "package", "version", "platform", "last_seen", "last_updated"];
           let node_id_tag = "#node-" + row.node_id.replace(/:/g, "_");
           for (let heading in headings) {
             let current = $(node_id_tag + " .node-" + headings[heading]).html();
@@ -646,21 +652,30 @@ document.addEventListener("DOMContentLoaded", function () {
             if ("number" === element_type) {
               current = parseInt(current);
             }
-            if (current !== row[headings[heading]]) {
+            
+            if ("title" === headings[heading]) {
+              let titleHtml = row.title + `  <span class="text-muted">(` + row.node_id + `)</span>`;
+              if (current !== titleHtml) {
+                $(node_id_tag + " .node-" + headings[heading]).html(titleHtml);
+              }
+            } else if (current !== row[headings[heading]]) {
               $(node_id_tag + " .node-" + headings[heading]).html(row[headings[heading]]);
             }
           }
         }
       }
 
-      $('.nodes-change-button').unbind("click");
-      $('.nodes-change-button').click(function (sender) {
+      /*
+       * Creates the node plackage change modal window
+       */
+      $('.nodes-change-package-button').unbind("click");
+      $('.nodes-change-package-button').click(function (sender) {
         // Populate the modal 
         let node_id = sender.currentTarget.dataset.nodeid;
-        let node_description = sender.currentTarget.dataset.description;
+        let node_title = sender.currentTarget.dataset.description;
         let current_package = sender.currentTarget.dataset.package;
 
-        $("#modal-node .modal-title").html("Change package (" + node_id + " - " + node_description + ")");
+        $("#modal-node .modal-title").html("Change Package for node \"" + node_title + "\" (" + node_id + ")");
 
         let data = $.ajax({
           url: "/packages/",
@@ -675,12 +690,88 @@ document.addEventListener("DOMContentLoaded", function () {
             }
             html += `">` + data[package].title + ` (` + data[package].name + `)</option>`
           }
-          html += `</option>`;
+          html += `</select>`;
+          html += ` <input type="hidden" name="type" value="package">`;
+
           $("#modal-node .modal-body").html(html);
         });
-
       });
 
+      /*
+       * Creates the node title setting modal window
+       */
+      $('.nodes-title-button').unbind("click");
+      $('.nodes-title-button').click(function (sender) {
+
+        let node_id = sender.currentTarget.dataset.nodeid;
+        let node_title = sender.currentTarget.dataset.title;
+
+        $("#modal-node .modal-title").html("Change Package for node \"" + node_title + "\" (" + node_id + ")");
+
+        let html = `
+          <label class="form-label">Node Title</label>
+          <input type="text" name="title" class="form-select nodes-change-title" value="` + node_title + `">
+        `;
+        html += ` <input type="hidden" name="type" value="title">`;
+        html += ` <input type="hidden" name="node_id" value="` + node_id + `">`;
+
+        $("#modal-node .modal-body").html(html);
+      });
+
+      /*
+       * Handle the user clicking submit on the general nodal for nodes
+       */
+      $('.nodes-modal-submit').unbind("click");
+      $('.nodes-modal-submit').click(function (sender) {
+
+        let inputs = $("#modal-node .modal-body").find("input");
+        let type = "";
+
+        for (let input in inputs) {
+          if ("type" === inputs[input].name) {
+            type = inputs[input].value;
+          }
+        }
+
+        switch(type) {
+          case "title":
+
+            let title = "", node_id = "";
+
+            for (let input in inputs) {
+              if ("node_id" === inputs[input].name) {
+                node_id = inputs[input].value;
+              } else if("title" === inputs[input].name) {
+                title = encodeURI(inputs[input].value);
+                title = title.replace(/#/g, '%23');
+              }
+            }
+
+            let url = "/node_title/";
+            url += "?node_id=" + node_id;
+            url += "&title=" + title;
+
+            let data = $.ajax({
+              url: url,
+              type: "PUT"
+            }).fail(function (jqXHR, textStatus, errorThrown) {
+              let json = jqXHR.responseJSON;
+              addAlert(json.message, json.detail, "ERROR");
+              $(".nodes-modal-submit").unbind("click");
+              $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+            }).done(function (data, textStatus, jqXHR) {
+              $(".nodes-modal-submit").unbind("click");
+              $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+            });
+
+            break;
+          case "platform":
+            break;
+          default:
+            break;
+        }
+
+      });
 
 
     });

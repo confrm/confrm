@@ -395,7 +395,7 @@ async def get_nodes(package: str = "", node_id: str = ""):
     node_list = []
     if package and node_id:
         node_list = nodes.search((query.package == package) &
-                (query.node_id == node_id))
+                                 (query.node_id == node_id))
     elif package:
         node_list = nodes.search(query.package == package)
     elif node_id:
@@ -452,15 +452,17 @@ async def put_node_title(response: Response, node_id: str = "", title: str = "")
             " found"
         }
 
-    if len(title) > 20:
+    print(title)
+    title = escape(title)
+
+    if len(title) > 80:
         msg = "Node title is too long"
         logging.info(msg)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return {
             "error": "confrm-023",
             "message": msg,
-            "detail": "While attempting to set the title of a node, the node id given was not"
-            " found"
+            "detail": "While attempting to set the title of a node, the title was too long"
         }
 
     nodes.update(set("title", title), query.node_id == node_id)
@@ -608,7 +610,7 @@ async def add_package_version(
             "message": msg,
             "detail": "While attempting to add a new package version the version given " +
             " was found to contain negative numbers"
-        } 
+        }
 
     # Package was uploaded, create hash of binary
     _h = SHA256.new()
@@ -658,7 +660,7 @@ async def add_package_version(
     return {}
 
 
-@APP.delete("/package_version/", status_code = status.HTTP_200_OK)
+@APP.delete("/package_version/", status_code=status.HTTP_200_OK)
 async def del_package_version(package: str, version: str, response: Response):
     """ Delete a package version
 
@@ -708,7 +710,7 @@ async def del_package_version(package: str, version: str, response: Response):
         logging.info(msg)
         response.status_code = status.HTTP_200_OK
         return {
-                "warning": "confrm-021",
+            "warning": "confrm-021",
             "message": msg,
             "detail": "While deleting a package version the version specified was set as the"
             " current active version. The package version was deleted and the active version "
@@ -880,8 +882,6 @@ async def node_package(node_id: str, package: str, response: Response, version: 
                 "detail": "While attempting to set a node to use a particular package the " +
                 " version given was not found"
             }
-
-
 
     node_doc = nodes.get(query.node_id == node_id)
     if node_doc is None:
@@ -1101,6 +1101,6 @@ async def get_config(key: str, response: Response, package: str = "", node_id: s
             "message": msg,
             "detail": f"Key \"{key}\" was not found for package \"{package}\""
             " / node \"{node_id}\""
-            }
+        }
 
     return {"value": doc["value"]}

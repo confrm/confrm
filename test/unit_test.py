@@ -705,7 +705,8 @@ def test_put_node_title():
             # Test the setting a node title to an incorrect name
             response = client.put("/node_title/" +
                                   "?node_id=0:12:3:4" +
-                                  "&title=Bad%20Name_that_is_very_much_far_too_long_and_should_be_rejected")
+                                  "&title=Bad%20Name_that_is_very_much_far_too_long_and_should_" +
+                                  "be_rejected_but_needs_to_be_over_80_chars_long")
             assert response.status_code == 400
             assert response.json()["error"] == "confrm-023"
 
