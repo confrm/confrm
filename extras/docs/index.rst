@@ -7,6 +7,7 @@
    user_guide
    compiling
    databases
+   fat
 
 .. include:: ../../README.rst
    :end-before: ----
