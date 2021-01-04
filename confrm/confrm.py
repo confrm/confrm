@@ -16,11 +16,11 @@ limitations under the License.
 
 Codes:
 
-    001 : "No versions found for package"
-    002 : "Package not found"
-    003 : "Package already exists"
-    004
-    005
+    001 ERROR   GET         /check_for_update/      No versions found for package
+    002 ERROR   GET         /check_for_update/      Package not found
+    003 ERROR   PUT         /package/               Package already exists
+    004 ERROR   PUT         /package/               Package name cannot be empty
+    005 ERROR   PUT         /package_version/       Package not found
     006
     007
     008
@@ -33,12 +33,12 @@ Codes:
     015
     016
     017  Version numbers cannot be negative
-    018 ERROR    PUT       /node_package/      Package version not found
-    019 ERROR    DELETE    /package_version/   Package not found
-    020 ERROR    DELETE    /package_version/   Package version not found
-    021 WARNING  DELETE    /package_version/   Active version not set
-    022 ERROR    PUT       /node_title/        Node does not exist
-    023 ERROR    PUT       /node_title/        Node title is too long
+    018 ERROR    PUT       /node_package/           Package version not found
+    019 ERROR    DELETE    /package_version/        Package not found
+    020 ERROR    DELETE    /package_version/        Package version not found
+    021 WARNING  DELETE    /package_version/        Active version not set
+    022 ERROR    PUT       /node_title/             Node does not exist
+    023 ERROR    PUT       /node_title/             Node title is too long
     024
     025
     026
@@ -56,15 +56,16 @@ import re
 import time
 import uuid
 
+from copy import deepcopy
+
 import toml
 
-from copy import deepcopy
 from Crypto.Hash import SHA256
 from fastapi import FastAPI, File, Depends, Response, Request, status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from tinydb import TinyDB, Query
-from tinydb.operations import delete, set
+from tinydb.operations import delete
 from markupsafe import escape
 from pydantic import BaseModel  # pylint: disable=E0611
 
@@ -232,7 +233,7 @@ def get_package_version_by_version_string(package_name: str, version: str):
         (query.revision == int(parts[2])))
 
 
-def sort_configs(configs):
+def sort_configs(configs):  # pylint: disable=R0912
     """Sort configs by global/package/node, then by package name, then by node name
 
     Attributes:
@@ -262,7 +263,8 @@ def sort_configs(configs):
                     _nodes.append(config)
 
         # Sort the package end node elements alphabetically
-        _package_ids = sorted([_package["id"] for _package in _packages], key=str.lower)
+        _package_ids = sorted([_package["id"]
+                               for _package in _packages], key=str.lower)
         for package in _package_ids:
             for config in configs:
                 if config["key"] == key and config["type"] == "package" and config["id"] == package:
@@ -276,7 +278,7 @@ def sort_configs(configs):
                     result.append(config)
                     break
 
-    return result 
+    return result
 
 
 # Files server in /static will point to ./dashboard (with respect to the running
@@ -299,16 +301,6 @@ async def shutdown_event():
     """Is called on application shutdown"""
 
     ZEROCONF.close()
-
-
-@APP.get("/zeroconf")
-async def test_zeroconf(name: str, package: str):
-    ZEROCONF.register_package(name, package)
-
-
-@APP.get("/unzeroconf")
-async def test_unzeroconf(name: str, package: str):
-    ZEROCONF.unregister_package(name, package)
 
 
 @APP.get("/")
@@ -344,7 +336,7 @@ async def get_time():
 
 
 @APP.put("/register_node/", status_code=status.HTTP_200_OK)
-async def register_node(
+async def register_node(  # pylint: disable=R0913
         node_id: str,
         package: str,
         version: str,
@@ -364,8 +356,8 @@ async def register_node(
         response (Response): Starlette response object for setting return codes
 
     Returns:
-        HTTP_200_OK / {} if registration successful
-        HTTP_404_NOT_FOUND / {"info": msg} if not successful, information is msg
+        HTTP_200_OK
+        HTTP_404_NOT_FOUND
     """
 
     packages = DB.table("packages")
@@ -775,18 +767,6 @@ async def get_package(name: str, response: Response, lite: bool = False):
     query = Query()
     package = packages.get(query.name == name)
     if package is not None:
-        # Sign the binary hash with the current private key
-        #        blob_hash = int.from_bytes(str.encode(package["blob_hash"]), byteorder="big")
-        #        signature = hex(pow(blob_hash, privateKey.d, privateKey.n))
-        #        package["signature"] = signature
-        #        del package["blob"]
-        #
-        #        bytesig = bytes.fromhex(signature[2:])
-        #        hashFromSig = pow(int.from_bytes(bytesig, byteorder='big'), privateKey.e, privateKey.n)
-        #
-        #        print(blob_hash)
-        #        print(hashFromSig)
-
         return format_package_info(package, lite)
 
     response.status_code = status.HTTP_404_NOT_FOUND
@@ -1031,8 +1011,8 @@ async def put_config(type: str, key: str, value: str, response: Response, id: st
     if type == "global":
         key_doc = config.get((query.key == key) & (query.type == "global"))
         if key_doc is not None:
-            config.update({"value": value}, doc_ids = [key_doc.doc_id])
-            #TODO: Warning for updating, including from and to values
+            config.update({"value": value}, doc_ids=[key_doc.doc_id])
+            # TODO: Warning for updating, including from and to values
         else:
             config_doc = {
                 "type": type,
@@ -1059,8 +1039,8 @@ async def put_config(type: str, key: str, value: str, response: Response, id: st
                              (query.type == "package") &
                              (query.id == id))
         if key_doc is not None:
-            config.update({"value": value}, doc_ids = [key_doc.doc_id])
-            #TODO: Warning for updating, including from and to values
+            config.update({"value": value}, doc_ids=[key_doc.doc_id])
+            # TODO: Warning for updating, including from and to values
         else:
             config_doc = {
                 "type": type,
@@ -1089,8 +1069,8 @@ async def put_config(type: str, key: str, value: str, response: Response, id: st
                              (query.id == id))
 
         if key_doc is not None:
-            config.update({"value": value}, doc_ids = [key_doc.doc_id])
-            #TODO: Warning for updating, including from and to values
+            config.update({"value": value}, doc_ids=[key_doc.doc_id])
+            # TODO: Warning for updating, including from and to values
         else:
             config_doc = {
                 "type": type,
