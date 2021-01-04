@@ -39,7 +39,7 @@ Codes:
     021 WARNING  DELETE    /package_version/        Active version not set
     022 ERROR    PUT       /node_title/             Node does not exist
     023 ERROR    PUT       /node_title/             Node title is too long
-    024
+    024 ERROR    DELETE    /config/                 Key not found
     025
     026
     027
@@ -1130,3 +1130,75 @@ async def get_config(response: Response, key: str = "", package: str = "", node_
         }
 
     return {"value": doc["value"]}
+
+
+@APP.delete("/config/", status_code=status.HTTP_200_OK)
+async def del_config(key: str, type: str, response: Response, id: str = ""):
+    """Delete a config from the database
+
+    Attributes:
+
+        key (str): key to be deleted
+        type (str): global/package/node
+        id (str): package or node id as per type
+        response (Response): Starlette response object
+    """
+
+    query = Query()
+    config = DB.table("config")
+
+    if type == "global":
+
+        global_doc = config.get((query.key == key) &
+                                (query.type == "global"))
+        if global_doc is not None:
+            config.remove(doc_ids=[global_doc.doc_id])
+        else:
+            msg = "Key not found"
+            logging.info(msg)
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return {
+                "error": "confrm-024",
+                "message": msg,
+                "detail": f"Key \"{key}\" was not found, unable to delete it"
+            }
+
+    elif type == "package":
+
+        package_doc = config.get((query.key == key) &
+                                 (query.id == id) &
+                                 (query.type == "package"))
+
+        if package_doc is not None:
+            config.remove(doc_ids=[package_doc.doc_id])
+        else:
+            msg = "Key not found"
+            logging.info(msg)
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return {
+                "error": "confrm-024",
+                "message": msg,
+                "detail": f"Key \"{key}\" was not found for package \"{id}\","
+                " unable to delete it"
+            }
+
+    elif type == "node":
+
+        node_doc = config.get((query.key == key) &
+                              (query.id == id) &
+                              (query.type == "node"))
+
+        if node_doc is not None:
+            config.remove(doc_ids=[node_doc.doc_id])
+        else:
+            msg = "Key not found"
+            logging.info(msg)
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return {
+                "error": "confrm-024",
+                "message": msg,
+                "detail": f"Key \"{key}\" was not found for node \"{id}\","
+                " unable to delete it"
+            }
+
+    return {}
