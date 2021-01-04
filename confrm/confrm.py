@@ -502,7 +502,7 @@ async def put_node_title(response: Response, node_id: str = "", title: str = "")
             "detail": "While attempting to set the title of a node, the title was too long"
         }
 
-    nodes.update(set("title", title), query.node_id == node_id)
+    nodes.update({"title": title}, query.node_id == node_id)
     return {}
 
 
