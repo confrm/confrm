@@ -682,7 +682,7 @@ def test_config():
                                   "&value=value_changed_package")
             assert response.status_code == 201
 
-            # Test retrieving changed config key (node override)
+            # Test retrieving changed config key (package)
             response = client.get("/config/" +
                                   "?key=key_a" +
                                   "&package=package_b")
@@ -696,11 +696,94 @@ def test_config():
                                   "&value=value_changed_global")
             assert response.status_code == 201
 
-            # Test retrieving changed config key (node override)
+            # Test retrieving changed config key (global)
             response = client.get("/config/" +
                                   "?key=key_a")
             assert response.status_code == 200
             assert response.json()["value"] == "value_changed_global"
+
+            ###################################################################
+            # Deleting a key that does not exist should create an error
+            ###################################################################
+
+            # Test deleting a config that does not exist
+            response = client.delete("/config/" +
+                                     "?key=key_not_here" +
+                                     "&type=global")
+            assert response.status_code == 404
+            assert response.json()["error"] == "confrm-024"
+
+            ###################################################################
+            # Test getting / deleting / getting a key, should be pass, pass
+            # fail - global key
+            ###################################################################
+
+            # Test retrieving a key prior to deletion (global)
+            response = client.get("/config/" +
+                                  "?key=key_a")
+            assert response.status_code == 200
+
+            # Test deleting a config that does exist (global)
+            response = client.delete("/config/" +
+                                     "?key=key_a" +
+                                     "&type=global")
+            assert response.status_code == 200
+
+            # Test retrieving deleted key (global)
+            response = client.get("/config/" +
+                                  "?key=key_a")
+            assert response.status_code == 404
+            assert response.json()["error"] == "confrm-012"
+
+            ###################################################################
+            # Test getting / deleting / getting a key, should be pass, pass
+            # fail - package key
+            ###################################################################
+
+            # Test retrieving key prior to deletion
+            response = client.get("/config/" +
+                                  "?key=key_a" +
+                                  "&package=package_b")
+            assert response.status_code == 200
+
+            # Test deleting a config that does exist (package)
+            response = client.delete("/config/" +
+                                     "?key=key_a" +
+                                     "&type=package" +
+                                     "&id=package_b")
+            assert response.status_code == 200
+
+            # Test retrieving deleted key (package)
+            response = client.get("/config/" +
+                                  "?key=key_a" +
+                                  "&package=package_b")
+            assert response.status_code == 404
+            assert response.json()["error"] == "confrm-012"
+
+            ###################################################################
+            # Test getting / deleting / getting a key, should be pass, pass
+            # fail - node key
+            ###################################################################
+
+            # Test retrieving deleted key (node)
+            response = client.get("/config/" +
+                                  "?key=key_a" +
+                                  "&node_id=1:12:3:4")
+            assert response.status_code == 200
+
+            # Test deleting a config that does exist (node)
+            response = client.delete("/config/" +
+                                     "?key=key_a" +
+                                     "&type=node" +
+                                     "&id=1:12:3:4")
+            assert response.status_code == 200
+
+            # Test retrieving deleted key (node)
+            response = client.get("/config/" +
+                                  "?key=key_a" +
+                                  "&node_id=1:12:3:4")
+            assert response.status_code == 404
+            assert response.json()["error"] == "confrm-012"
 
 
 def test_put_node_title():
