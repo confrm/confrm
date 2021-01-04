@@ -172,6 +172,92 @@ def test_put_package():
             assert response.status_code == 400
 
 
+def test_delete_package():
+    """Test the package deleting works"""
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        config_file = os.path.join(data_dir, CONFIG_NAME)
+        with open(config_file, "w") as file:
+            file.write(get_config_file(data_dir))
+        os.environ["CONFRM_CONFIG"] = config_file
+
+        test_file_content = bytearray(os.urandom(1000))
+        test_file = os.path.join(data_dir, "test.bin")
+        with open(test_file, "wb") as file_ptr:
+            file_ptr.write(test_file_content)
+
+        with TestClient(APP) as client:
+
+            response = client.put("/package/" +
+                                  "?name=test_package" +
+                                  "&description=some%20description" +
+                                  "&title=Good%20Name" +
+                                  "&platform=esp32")
+            assert response.status_code == 201
+
+            # Add a package version - keep track of files in data directory
+            files = os.listdir(data_dir)
+            with open(test_file, "rb") as file_ptr:
+                response = client.post("/package_version/" +
+                                       "?name=test_package" +
+                                       "&major=1" +
+                                       "&minor=2" +
+                                       "&revision=3",
+                                       files={"file": ("filename", file_ptr, "application/binary")})
+                assert response.status_code == 201
+            files_new = os.listdir(data_dir)
+
+            # Get the newly created file
+            new_file = ""
+            for filename in files_new:
+                if filename not in files:
+                    new_file = filename
+            assert new_file
+            assert os.path.isfile(os.path.join(data_dir, new_file))
+
+            # Create a config for this package
+            response = client.put("/config/" +
+                                  "?type=package" +
+                                  "&id=test_package" +
+                                  "&key=key_a"
+                                  "&value=value_package")
+            assert response.status_code == 201
+
+            # Test the config worked
+            response = client.get("/config/" +
+                                  "?key=key_a" +
+                                  "&package=test_package")
+            assert response.status_code == 200
+
+            # Test the package was stored correctly
+            response = client.get("/package/?name=test_package")
+            assert response.status_code == 200
+
+            # Test deleting a package that does not exist
+            response = client.delete("/package/" +
+                                     "?name=not_there")
+            assert response.status_code == 404
+            assert response.json()["error"] == "confrm-025"
+
+            # Test delete the package
+            response = client.delete("/package/" +
+                                     "?name=test_package")
+            assert response.status_code == 200
+
+            # Test the package was deleted
+            response = client.get("/package/?name=test_package")
+            assert response.status_code == 404
+
+            # Check the file was deleted too
+            assert not os.path.isfile(os.path.join(data_dir, new_file))
+
+            # Test the config was deleted
+            response = client.get("/config/" +
+                                  "?key=key_a" +
+                                  "&package=test_package")
+            assert response.status_code == 404
+
+
 def test_delete_package_version():
     """Tests deleting versions for a given package"""
 
