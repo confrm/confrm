@@ -894,8 +894,8 @@ document.addEventListener("DOMContentLoaded", function () {
       /*
        * Creates the node title setting modal window
        */
-      $('.config-delete-button').unbind("click");
-      $('.config-delete-button').click(function (sender) {
+      $(".config-delete-button").unbind("click");
+      $(".config-delete-button").click(function (sender) {
 
         // Populate the modal 
         let id = sender.currentTarget.dataset.id;
@@ -903,6 +903,9 @@ document.addEventListener("DOMContentLoaded", function () {
         let type = sender.currentTarget.dataset.type;
 
         let html = `Do you really want to delete config "` + key + `"`;
+        html += `<input type="hidden" name="id" value="` + id + `">`;
+        html += `<input type="hidden" name="key" value="` + key + `">`;
+        html += `<input type="hidden" name="type" value="` + type + `">`;
 
         if ("global" === type) {
           html += ` (global)`;
@@ -918,12 +921,60 @@ document.addEventListener("DOMContentLoaded", function () {
 
       });
 
+      $(".modal-config-confrm-yes").unbind("click");
+      $(".modal-config-confrm-yes").click(function () {
+        
+        let inputs = $("#modal-config-confirm").find("input");
+
+        let id = "";
+        let key = "";
+        let type = "";
+
+        for (let input in inputs) {
+          let val = inputs[input].value;
+          switch (inputs[input].name) {
+            case "id":
+              id = val;
+              break;
+            case "key":
+              key = val;
+              break;
+            case "type":
+              type = val;
+            default:
+              break;
+          }
+        }
+
+        let url = "/config/";
+        url += "?type=" + type;
+        url += "&key=" + key;
+        if (type !== "global") {
+          url += "&id=" + id;
+        }
+
+        let data = $.ajax({
+          url: url,
+          type: "DELETE"
+        }).fail(function (jqXHR, textStatus, errorThrown) {
+          let json = jqXHR.responseJSON;
+          addAlert(json.message, json.detail, "ERROR");
+          $(".modal-config-confrm-yes").unbind("click");
+          $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+        }).done(function (data, textStatus, jqXHR) {
+          $(".modal-config-confrm-yes").unbind("click");
+          $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+          updateConfigsTable();
+        });
+
+
+      });
 
       /*
        * Handles the add button being pressed
        */
-      $('.config-add-button').unbind('click');
-      $('.config-add-button').click(function (sender) {
+      $(".config-add-button").unbind("click");
+      $(".config-add-button").click(function (sender) {
         let type = sender.currentTarget.dataset.type;
 
         if ("global" === type) {
@@ -1073,7 +1124,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       /*
        * Handle the user clicking submit on the general nodal for nodes
-       */
+       *//*
       $('.nodes-modal-submit').unbind("click");
       $('.nodes-modal-submit').click(function (sender) {
 
@@ -1124,7 +1175,7 @@ document.addEventListener("DOMContentLoaded", function () {
             break;
         }
 
-      });
+      }); */
 
 
     });
