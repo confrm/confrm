@@ -13,6 +13,39 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
+Codes:
+
+    001 ERROR   GET         /check_for_update/      No versions found for package
+    002 ERROR   GET         /check_for_update/      Package not found
+    003 ERROR   PUT         /package/               Package already exists
+    004 ERROR   PUT         /package/               Package name cannot be empty
+    005 ERROR   PUT         /package_version/       Package not found
+    006
+    007
+    008
+    009
+    010
+    011
+    012
+    013
+    014
+    015
+    016
+    017  Version numbers cannot be negative
+    018 ERROR    PUT       /node_package/           Package version not found
+    019 ERROR    DELETE    /package_version/        Package not found
+    020 ERROR    DELETE    /package_version/        Package version not found
+    021 WARNING  DELETE    /package_version/        Active version not set
+    022 ERROR    PUT       /node_title/             Node does not exist
+    023 ERROR    PUT       /node_title/             Node title is too long
+    024 ERROR    DELETE    /config/                 Key not found
+    025
+    026
+    027
+    028
+    029
+
 """
 
 import base64
@@ -23,14 +56,16 @@ import re
 import time
 import uuid
 
+from copy import deepcopy
+
 import toml
 
 from Crypto.Hash import SHA256
-from Crypto.PublicKey import RSA
-from fastapi import FastAPI, File, Depends, Response, status
+from fastapi import FastAPI, File, Depends, Response, Request, status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from tinydb import TinyDB, Query
+from tinydb.operations import delete
 from markupsafe import escape
 from pydantic import BaseModel  # pylint: disable=E0611
 
@@ -114,18 +149,25 @@ def get_package_versions(name: str, package: {} = None):
     versions = []
     current_version = None
     for entry in versions_raw:
+
+        date_str = ""
+        if entry["date"] <= 0:
+            date_str = "Unknown"
+        else:
+            date_str = datetime.datetime.fromtimestamp(entry["date"])
+
         version_str = f'{entry["major"]}.{entry["minor"]}.{entry["revision"]}'
         if "current_version" in package.keys() and \
                 version_str == package["current_version"]:
             current_version = {
                 "number": version_str,
-                "date": entry["date"],
+                "date": date_str,
                 "blob": entry["blob_id"]
             }
         else:
             versions.append({
                 "number": version_str,
-                "date": entry["date"],
+                "date": date_str,
                 "blob": entry["blob_id"]
             })
             versions = sorted(
@@ -178,6 +220,67 @@ def format_package_info(package: dict, lite: bool = False):
     }
 
 
+def get_package_version_by_version_string(package_name: str, version: str):
+    """Get package version using string name and string version number"""
+
+    package_versions = DB.table("package_versions")
+    query = Query()
+    parts = version.split(".")
+    return package_versions.get(
+        (query.name == package_name) &
+        (query.major == int(parts[0])) &
+        (query.minor == int(parts[1])) &
+        (query.revision == int(parts[2])))
+
+
+def sort_configs(configs):  # pylint: disable=R0912
+    """Sort configs by global/package/node, then by package name, then by node name
+
+    Attributes:
+        configs (list): List of config dicts
+    """
+
+    result = []
+
+    # Find all unique keys and sort alphabetically
+    _keys = []
+    for config in configs:
+        if config["key"] not in _keys:
+            _keys.append(config["key"])
+    _keys = sorted(_keys, key=str.lower)
+
+    # For each key find globals, then packages, then nodes
+    for key in _keys:
+        _packages = []
+        _nodes = []
+        for config in configs:
+            if config["key"] == key:
+                if config["type"] == "global":
+                    result.append(config)
+                elif config["type"] == "package":
+                    _packages.append(config)
+                elif config["type"] == "node":
+                    _nodes.append(config)
+
+        # Sort the package end node elements alphabetically
+        _package_ids = sorted([_package["id"]
+                               for _package in _packages], key=str.lower)
+        for package in _package_ids:
+            for config in configs:
+                if config["key"] == key and config["type"] == "package" and config["id"] == package:
+                    result.append(config)
+                    break
+
+        _node_ids = sorted([_node["id"] for _node in _nodes], key=str.lower)
+        for node in _node_ids:
+            for config in configs:
+                if config["key"] == key and config["type"] == "node" and config["id"] == node:
+                    result.append(config)
+                    break
+
+    return result
+
+
 # Files server in /static will point to ./dashboard (with respect to the running
 # script)
 APP.mount("/static",
@@ -198,16 +301,6 @@ async def shutdown_event():
     """Is called on application shutdown"""
 
     ZEROCONF.close()
-
-
-@APP.get("/zeroconf")
-async def test_zeroconf(name: str, package: str):
-    ZEROCONF.register_package(name, package)
-
-
-@APP.get("/unzeroconf")
-async def test_unzeroconf(name: str, package: str):
-    ZEROCONF.unregister_package(name, package)
 
 
 @APP.get("/")
@@ -243,12 +336,13 @@ async def get_time():
 
 
 @APP.put("/register_node/", status_code=status.HTTP_200_OK)
-async def register_node(
+async def register_node(  # pylint: disable=R0913
         node_id: str,
         package: str,
         version: str,
         description: str,
         platform: str,
+        request: Request,
         response: Response):
     """Registers a node to the server
 
@@ -258,11 +352,12 @@ async def register_node(
         version (str): Version string of currently running package
         description (str): Description of package
         platform: (str): Platform type (i.e. esp32)
+        request (Request): Starlette request object for getting client information
         response (Response): Starlette response object for setting return codes
 
     Returns:
-        HTTP_200_OK / {} if registration successful
-        HTTP_404_NOT_FOUND / {"info": msg} if not successful, information is msg
+        HTTP_200_OK
+        HTTP_404_NOT_FOUND
     """
 
     packages = DB.table("packages")
@@ -277,74 +372,138 @@ async def register_node(
     description = escape(description)
     platform = escape(platform)
 
-    package_entry = packages.get(query.name == package)
-    if package_entry is None:
+    package_doc = packages.get(query.name == package)
+    if package_doc is None:
         response.status_code = status.HTTP_404_NOT_FOUND
-        return {"info": "Unknown package name"}
+        return {"info": "Unknown package name"}  # TODO: Set errorno
 
-    node_entry = nodes.get(query.node_id == node_id)
-    if node_entry is None:
+    node_doc = nodes.get(query.node_id == node_id)
+    if node_doc is None:
         entry = {
             "node_id": node_id,
+            "title": node_id,
             "package": package,
             "version": version,
             "description": description,
             "platform": platform,
             "last_updated": -1,
-            "last_seen": round(time.time())
+            "last_seen": round(time.time()),
+            "ip_address": request.client.host
         }
         nodes.insert(entry)
         return {}
 
     # Update the package entry based on package name change, new version of a package
     # and register this as the last update time
-    if node_entry["package"] != package:  # Package changed
-        node_entry["package"] = package
-        node_entry["version"] = version
-        node_entry["last_updated"] = -1
-    elif node_entry["version"] != version:  # Version of package changed
-        node_entry["version"] = version
-        node_entry["last_updated"] = round(time.time())
-    node_entry["last_seen"] = round(time.time())
+    if node_doc["package"] != package:  # Package changed
+        node_doc["package"] = package
+        node_doc["version"] = version
+        node_doc["last_updated"] = -1
+    elif node_doc["version"] != version:  # Version of package changed
+        node_doc["version"] = version
+        node_doc["last_updated"] = round(time.time())
+    node_doc["last_seen"] = round(time.time())
 
-    node_entry["package"] = package
-    node_entry["description"] = description
-    node_entry["platform"] = platform
+    node_doc["package"] = package
+    node_doc["description"] = description
+    node_doc["platform"] = platform
+    node_doc["ip_address"] = request.client.host
 
-    nodes.update(node_entry, query.node_id == node_id)
+    nodes.update(node_doc, query.node_id == node_id)
+
+    # Check to see if a canary
+    if "canary" in node_doc.keys():
+        if node_doc["canary"]["package"] == package and node_doc["canary"]["version"] == version:
+            nodes.update(delete("canary"), query.node_id == node_id)
 
     return {}
 
 
 @APP.get("/nodes/", status_code=status.HTTP_200_OK)
-async def get_nodes(package: str = ""):
-    """Returns a list of nodes using a given package
+async def get_nodes(package: str = "", node_id: str = ""):
+    """Returns a list of nodes, if package is set the only return nodes using that package, if
+    a node is set then return the doc for that node.
 
     Attributes:
         package (str): name of package to return node list for
     """
 
+    query = Query()
     nodes = DB.table("nodes")
 
     node_list = []
-    if not package:
-        node_list = nodes.all()
-    else:
-        query = Query()
+    if package and node_id:
+        node_list = nodes.search((query.package == package) &
+                                 (query.node_id == node_id))
+    elif package:
         node_list = nodes.search(query.package == package)
+    elif node_id:
+        node_list = nodes.search(query.node_id == node_id)
+    else:
+        node_list = nodes.all()
 
     if len(node_list) == 0:
         return {}
+
+    # Make a new copy of list so we can make changes to elements for display layer without
+    # changing the values in the database
+    new_node_list = deepcopy(node_list)
+    node_list = new_node_list
 
     for node in node_list:
         if node["last_updated"] != -1:
             value = datetime.datetime.fromtimestamp(node["last_updated"])
             node["last_updated"] = f"{value:%Y-%m-%d %H:%M:%S}"
+        else:
+            node["last_updated"] = "Unknown"
         if node["last_seen"] != -1:
             value = datetime.datetime.fromtimestamp(node["last_seen"])
             node["last_seen"] = f"{value:%Y-%m-%d %H:%M:%S}"
+        else:
+            node["last_seen"] = "Unknown"
 
+    if not package and node_id:
+        return node_list[0]
     return node_list
+
+
+@APP.put("/node_title/", status_code=status.HTTP_200_OK)
+async def put_node_title(response: Response, node_id: str = "", title: str = ""):
+    """Sets the title of a node
+
+    Attributes:
+        package (str): name of package to return node list for
+    """
+
+    query = Query()
+    nodes = DB.table("nodes")
+
+    node_doc = nodes.get(query.node_id == node_id)
+    if node_doc is None:
+        msg = "Node does not exist"
+        logging.info(msg)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {
+            "error": "confrm-022",
+            "message": msg,
+            "detail": "While attempting to set the title of a node, the node id given was not"
+            " found"
+        }
+
+    title = escape(title)
+
+    if len(title) > 80:
+        msg = "Node title is too long"
+        logging.info(msg)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {
+            "error": "confrm-023",
+            "message": msg,
+            "detail": "While attempting to set the title of a node, the title was too long"
+        }
+
+    nodes.update({"title": title}, query.node_id == node_id)
+    return {}
 
 
 @APP.get("/packages/")
@@ -442,7 +601,7 @@ async def add_package_version(
         file (bytes): File uploaded
     Returns:
         HTTP_201_CREATED if successful
-        HTTP_404_NOT_FOUNT if package is not found
+        HTTP_404_NOT_FOUND if package is not found
     """
 
     package_version_dict = package_version.__dict__
@@ -479,6 +638,17 @@ async def add_package_version(
             " was found to be already used"
         }
 
+    if package_version_dict["major"] < 0 or package_version_dict["minor"] < 0 or package_version_dict["revision"] < 0:
+        msg = "Version number elements cannot be negative"
+        logging.info(msg)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {
+            "error": "confrm-017",
+            "message": msg,
+            "detail": "While attempting to add a new package version the version given " +
+            " was found to contain negative numbers"
+        }
+
     # Package was uploaded, create hash of binary
     _h = SHA256.new()
     _h.update(file)
@@ -509,41 +679,82 @@ async def add_package_version(
         package["current_version"] = version
         packages.update(package, query.name == package["name"])
 
+    nodes = DB.table("nodes")
+    canaries = nodes.search(query.canary != "")
+    package_canaries = []
+    for canary in canaries:
+        if canary["canary"]["package"] == package_version_dict["name"]:
+            package_canaries.append(canary)
+    if len(package_canaries) != 0:
+        return {
+            "warning": "confrm-011",
+            "msg": "Canaries are set for this package",
+            "detail": "The package version was added, however canary nodes were identified"
+            " as being configured for this package - unless manually cancelled those nodes"
+            " will update to the canary configuration"
+        }
+
     return {}
 
 
-@APP.delete("/package_version/")
-async def del_package_version(name: str, version: str):
-    """ Delete a version """
-    if CONFIG is None:
-        do_config()
+@APP.delete("/package_version/", status_code=status.HTTP_200_OK)
+async def del_package_version(package: str, version: str, response: Response):
+    """ Delete a package version
+
+        Attributes:
+
+            package (str): Package with version to be deleted
+            version (str): Version to be deleted
+            response (Response): Starlette response object
+    """
 
     packages = DB.table("packages")
     query = Query()
 
-    package = packages.get(query.name == name)
-    if package is not None:
-        if "current_version" in package.keys():
-            if version == package["current_version"]:
-                return {"ok": False}
+    package_doc = packages.get(query.name == package)
+    if package_doc is None:
+        msg = "Package not found"
+        logging.info(msg)
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return {
+            "error": "confrm-019",
+            "message": msg,
+            "detail": "While attempting to delete a package version the package specified" +
+            " was not found"
+        }
 
     package_versions = DB.table("package_versions")
-    parts = version.split(".")
-    version_entry = package_versions.get(
-        (query.name == name) &
-        (query.major == int(parts[0])) &
-        (query.minor == int(parts[1])) &
-        (query.revision == int(parts[2])))
+    version_entry = get_package_version_by_version_string(package, version)
 
     if version_entry is None:
-        return {"ok": False}
+        msg = "Package version not found"
+        logging.info(msg)
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return {
+            "error": "confrm-020",
+            "message": msg,
+            "detail": "While attempting to delete a package version the version specified" +
+            " was not found"
+        }
 
     package_versions.remove(doc_ids=[version_entry.doc_id])
     file_path = os.path.join(
         CONFIG["storage"]["data_dir"], version_entry["blob_id"])
     os.remove(file_path)
 
-    return {"ok": True}
+    if package_doc["current_version"] == version:
+        msg = "Active version is not set"
+        logging.info(msg)
+        response.status_code = status.HTTP_200_OK
+        return {
+            "warning": "confrm-021",
+            "message": msg,
+            "detail": "While deleting a package version the version specified was set as the"
+            " current active version. The package version was deleted and the active version "
+            f" for package {package} is now not set"
+        }
+
+    return {}
 
 
 @APP.get("/package/", status_code=status.HTTP_200_OK)
@@ -556,18 +767,6 @@ async def get_package(name: str, response: Response, lite: bool = False):
     query = Query()
     package = packages.get(query.name == name)
     if package is not None:
-        # Sign the binary hash with the current private key
-        #        blob_hash = int.from_bytes(str.encode(package["blob_hash"]), byteorder="big")
-        #        signature = hex(pow(blob_hash, privateKey.d, privateKey.n))
-        #        package["signature"] = signature
-        #        del package["blob"]
-        #
-        #        bytesig = bytes.fromhex(signature[2:])
-        #        hashFromSig = pow(int.from_bytes(bytesig, byteorder='big'), privateKey.e, privateKey.n)
-        #
-        #        print(blob_hash)
-        #        print(hashFromSig)
-
         return format_package_info(package, lite)
 
     response.status_code = status.HTTP_404_NOT_FOUND
@@ -592,7 +791,6 @@ async def check_for_update(name: str, node_id: str, response: Response):
     """
 
     packages = DB.table("packages")
-    package_versions = DB.table("package_versions")
     nodes = DB.table("nodes")
 
     query = Query()
@@ -604,30 +802,20 @@ async def check_for_update(name: str, node_id: str, response: Response):
         node = nodes.get(query.node_id == node_id)
         if node is not None:
             if "canary" in node.keys():
-                # TODO: Refactor to use get_version
-                parts = node["canary"]["version"].split(".")
-                version_entry = package_versions.get(
-                    (query.name == node["canary"]["package"]) &
-                    (query.major == int(parts[0])) &
-                    (query.minor == int(parts[1])) &
-                    (query.revision == int(parts[2])))
-                # TODO: Refector for getting package by name
-                canary_package = packages.get(
-                    query.name == node["canary"]["package"])
+                version_doc = get_package_version_by_version_string(
+                    node["canary"]["package"],
+                    node["canary"]["version"])
                 return {
-                    "current_version": canary_package["current_version"],
-                    "blob": version_entry["blob_id"],
-                    "hash": version_entry["hash"],
+                    "current_version": node["canary"]["version"],
+                    "blob": version_doc["blob_id"],
+                    "hash": version_doc["hash"],
                     "force": True
                 }
 
         if "current_version" in package_doc.keys():
-            parts = package_doc["current_version"].split(".")
-            version_entry = package_versions.get(
-                (query.name == name) &
-                (query.major == int(parts[0])) &
-                (query.minor == int(parts[1])) &
-                (query.revision == int(parts[2])))
+            version_entry = get_package_version_by_version_string(
+                name,
+                package_doc["current_version"])
             return {
                 "current_version": package_doc["current_version"],
                 "blob": version_entry["blob_id"],
@@ -654,24 +842,17 @@ async def check_for_update(name: str, node_id: str, response: Response):
 @APP.put("/set_active_version/")
 async def set_active_version(name: str, version: str):
     """ Set the active version via the API """
-    if CONFIG is None:
-        do_config()
+    # TODO: Set error codes
 
     query = Query()
     packages = DB.table("packages")
-    package_versions = DB.table("package_versions")
 
     package_entry = packages.get(query.name == name)
     if package_entry is None:
         return {"ok": False, "info": "Package does not exist"}
 
-    parts = version.split(".")
-    version_entry = package_versions.search(
-        (query.name == name) &
-        (query.major == int(parts[0])) &
-        (query.minor == int(parts[1])) &
-        (query.revision == int(parts[2])))
-    if len(version_entry) < 1:
+    version_doc = get_package_version_by_version_string(name, version)
+    if len(version_doc) < 1:
         return {"ok": False, "info": "Specified version does not exist for package"}
 
     package_entry["current_version"] = version
@@ -702,16 +883,30 @@ async def node_package(node_id: str, package: str, response: Response, version: 
             " name given was not found"
         }
 
-    if not package_doc["current_version"]:
-        msg = "Package has no active version"
-        logging.info(msg)
-        response.status_code = status.HTTP_404_NOT_FOUND
-        return {
-            "error": "confrm-008",
-            "message": msg,
-            "detail": "While attempting to set a node to use a particular package the package" +
-            " was found to have no active versions"
-        }
+    if not version:
+        if not package_doc["current_version"]:
+            msg = "Package has no active version"
+            logging.info(msg)
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return {
+                "error": "confrm-008",
+                "message": msg,
+                "detail": "While attempting to set a node to use a particular package the package" +
+                " was found to have no active versions and no specific version was given"
+            }
+        version = package_doc["current_version"]
+    else:
+        version_doc = get_package_version_by_version_string(package, version)
+        if version_doc is None:
+            msg = "Package version not found"
+            logging.info(msg)
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return {
+                "error": "confrm-018",
+                "message": msg,
+                "detail": "While attempting to set a node to use a particular package the " +
+                " version given was not found"
+            }
 
     node_doc = nodes.get(query.node_id == node_id)
     if node_doc is None:
@@ -727,7 +922,7 @@ async def node_package(node_id: str, package: str, response: Response, version: 
 
     node_doc["canary"] = {
         "package": package,
-        "version": package_doc["current_version"]
+        "version": version
     }
     nodes.update(node_doc, query.node_id == node_id)
 
@@ -768,3 +963,242 @@ async def get_blob(name: str, blob: str):
         return
 
     return ConfrmFileResponse(data)
+
+
+@APP.put("/config/", status_code=status.HTTP_201_CREATED)
+async def put_config(type: str, key: str, value: str, response: Response, id: str = ""):
+    """Adds new config to the config database
+
+    Attributes:
+        type (str): One of global, package or node
+        id (str): Empty, package name or node_id
+        key (str): Key to be stored
+        value (str): Value to be stored
+    """
+
+    query = Query()
+    config = DB.table("config")
+    packages = DB.table("packages")
+    nodes = DB.table("nodes")
+
+    types = ["global", "package", "node"]
+
+    if not type or type not in types:
+        msg = "Type cannot be empty and must be a valid type"
+        logging.info(msg)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {
+            "error": "confrm-015",
+            "message": msg,
+            "detail": "While attempting to add a new config the type of config given was empty"
+            " or was incorrect."
+        }
+
+    pattern = '^[0-9a-zA-Z_-]+$'
+    regex = re.compile(pattern)
+
+    if regex.match(key) is None:
+        msg = f"Key name does not match pattern {pattern}"
+        logging.info(msg)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {
+            "error": "confrm-016",
+            "message": msg,
+            "detail": "While attempting to add a new config the key given did not match the"
+            f" pattern {pattern}"
+        }
+
+    if type == "global":
+        key_doc = config.get((query.key == key) & (query.type == "global"))
+        if key_doc is not None:
+            config.update({"value": value}, doc_ids=[key_doc.doc_id])
+            # TODO: Warning for updating, including from and to values
+        else:
+            config_doc = {
+                "type": type,
+                "id": id,
+                "key": key,
+                "value": value
+            }
+            config.insert(config_doc)
+
+    elif type == "package":
+        package_doc = packages.get(query.name == id)
+        if package_doc is None:
+            msg = "Package does not exist"
+            logging.info(msg)
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return {
+                "error": "confrm-013",
+                "message": msg,
+                "detail": "While attempting to add a new config for a package the package name "
+                " given does not match any existing packages"
+            }
+
+        key_doc = config.get((query.key == key) &
+                             (query.type == "package") &
+                             (query.id == id))
+        if key_doc is not None:
+            config.update({"value": value}, doc_ids=[key_doc.doc_id])
+            # TODO: Warning for updating, including from and to values
+        else:
+            config_doc = {
+                "type": type,
+                "id": id,
+                "key": key,
+                "value": value
+            }
+            config.insert(config_doc)
+
+    elif type == "node":
+
+        node_doc = nodes.get(query.node_id == id)
+        if node_doc is None:
+            msg = "Node does not exist"
+            logging.info(msg)
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return {
+                "error": "confrm-014",
+                "message": msg,
+                "detail": "While attempting to add a new config for a node the node_id does not "
+                " match any known node_id"
+            }
+
+        key_doc = config.get((query.key == key) &
+                             (query.type == "node") &
+                             (query.id == id))
+
+        if key_doc is not None:
+            config.update({"value": value}, doc_ids=[key_doc.doc_id])
+            # TODO: Warning for updating, including from and to values
+        else:
+            config_doc = {
+                "type": type,
+                "id": id,
+                "key": key,
+                "value": value
+            }
+            config.insert(config_doc)
+
+    return {}
+
+
+@APP.get("/config/", status_code=status.HTTP_200_OK)
+async def get_config(response: Response, key: str = "", package: str = "", node_id: str = ""):
+    """Get configuration value from database
+
+    Attributes:
+
+        key (str): Key to retrieve
+        response (Response): Starlette response object
+        package (str): Package of requesting node
+        node_id (str): node_id of requesting node
+    """
+
+    query = Query()
+    config = DB.table("config")
+
+    if node_id:
+        doc = config.get((query.type == "node") &
+                         (query.id == node_id) &
+                         (query.key == key))
+        if doc is not None:
+            return {"value": doc["value"]}
+
+    if package:
+        doc = config.get((query.type == "package") &
+                         (query.id == package) &
+                         (query.key == key))
+        if doc is not None:
+            return {"value": doc["value"]}
+
+    if not key:
+        return sort_configs(config.all())
+
+    # Must be global...
+    doc = config.get((query.type == "global") &
+                     (query.key == key))
+    if doc is None:
+        msg = "Key not found"
+        logging.info(msg)
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return {
+            "error": "confrm-012",
+            "message": msg,
+            "detail": f"Key \"{key}\" was not found for package \"{package}\""
+            " / node \"{node_id}\""
+        }
+
+    return {"value": doc["value"]}
+
+
+@APP.delete("/config/", status_code=status.HTTP_200_OK)
+async def del_config(key: str, type: str, response: Response, id: str = ""):
+    """Delete a config from the database
+
+    Attributes:
+
+        key (str): key to be deleted
+        type (str): global/package/node
+        id (str): package or node id as per type
+        response (Response): Starlette response object
+    """
+
+    query = Query()
+    config = DB.table("config")
+
+    if type == "global":
+
+        global_doc = config.get((query.key == key) &
+                                (query.type == "global"))
+        if global_doc is not None:
+            config.remove(doc_ids=[global_doc.doc_id])
+        else:
+            msg = "Key not found"
+            logging.info(msg)
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return {
+                "error": "confrm-024",
+                "message": msg,
+                "detail": f"Key \"{key}\" was not found, unable to delete it"
+            }
+
+    elif type == "package":
+
+        package_doc = config.get((query.key == key) &
+                                 (query.id == id) &
+                                 (query.type == "package"))
+
+        if package_doc is not None:
+            config.remove(doc_ids=[package_doc.doc_id])
+        else:
+            msg = "Key not found"
+            logging.info(msg)
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return {
+                "error": "confrm-024",
+                "message": msg,
+                "detail": f"Key \"{key}\" was not found for package \"{id}\","
+                " unable to delete it"
+            }
+
+    elif type == "node":
+
+        node_doc = config.get((query.key == key) &
+                              (query.id == id) &
+                              (query.type == "node"))
+
+        if node_doc is not None:
+            config.remove(doc_ids=[node_doc.doc_id])
+        else:
+            msg = "Key not found"
+            logging.info(msg)
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return {
+                "error": "confrm-024",
+                "message": msg,
+                "detail": f"Key \"{key}\" was not found for node \"{id}\","
+                " unable to delete it"
+            }
+
+    return {}
