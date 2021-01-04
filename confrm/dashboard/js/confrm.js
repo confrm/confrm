@@ -234,9 +234,9 @@ document.addEventListener("DOMContentLoaded", function () {
       type: "GET"
     }).then(function (data) {
 
-      let html = "";
-
       for (let entry in data) {
+
+        let html = "";
         let row = data[entry];
 
         let is_drawn = false;
@@ -588,7 +588,6 @@ document.addEventListener("DOMContentLoaded", function () {
           $(".package-add-submit").unbind("click");
           $("[data-bs-dismiss=modal]").trigger({ type: "click" });
           updateMeta(meta);
-          showPage("packages");
         });
 
       });
