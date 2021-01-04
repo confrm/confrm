@@ -435,10 +435,10 @@ document.addEventListener("DOMContentLoaded", function () {
           let json = jqXHR.responseJSON;
           addAlert(json.message, json.detail, "ERROR");
           $(".package-add-submit").unbind("click");
-          $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+          $("#modal-package-upload [data-bs-dismiss=modal]").trigger({ type: "click" });
         }).done(function (data, textStatus, jqXHR) {
           $(".package-add-submit").unbind("click");
-          $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+          $("#modal-package-upload [data-bs-dismiss=modal]").trigger({ type: "click" });
           updateMeta(meta);
           showPage("packages");
           let json = jqXHR.responseJSON;
@@ -583,10 +583,10 @@ document.addEventListener("DOMContentLoaded", function () {
           let json = jqXHR.responseJSON;
           addAlert(json.message, json.detail, "ERROR");
           $(".package-add-submit").unbind("click");
-          $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+          $("#modal-package-add [data-bs-dismiss=modal]").trigger({ type: "click" });
         }).done(function (data, textStatus, jqXHR) {
           $(".package-add-submit").unbind("click");
-          $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+          $("#modal-package-add [data-bs-dismiss=modal]").trigger({ type: "click" });
           updateMeta(meta);
         });
 
@@ -774,10 +774,10 @@ document.addEventListener("DOMContentLoaded", function () {
             let json = jqXHR.responseJSON;
             addAlert(json.message, json.detail, "ERROR");
             $(".nodes-modal-submit").unbind("click");
-            $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+            $("#modal-node [data-bs-dismiss=modal]").trigger({ type: "click" });
           }).done(function (data, textStatus, jqXHR) {
             $(".nodes-modal-submit").unbind("click");
-            $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+            $("#modal-node [data-bs-dismiss=modal]").trigger({ type: "click" });
           });
 
         } else if ("package" === type) {
@@ -834,6 +834,8 @@ document.addEventListener("DOMContentLoaded", function () {
       url: "/config/",
       type: "GET"
     }).then(function (data) {
+
+      $("#config-table-body").html("");
 
       for (let entry in data) {
 
@@ -951,8 +953,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
       });
 
-      $(".modal-config-confrm-yes").unbind("click");
-      $(".modal-config-confrm-yes").click(function () {
+      $(".modal-config-confirm-yes").unbind("click");
+      $(".modal-config-confirm-yes").click(function () {
         
         let inputs = $("#modal-config-confirm").find("input");
 
@@ -989,11 +991,11 @@ document.addEventListener("DOMContentLoaded", function () {
         }).fail(function (jqXHR, textStatus, errorThrown) {
           let json = jqXHR.responseJSON;
           addAlert(json.message, json.detail, "ERROR");
-          $(".modal-config-confrm-yes").unbind("click");
-          $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+          $(".modal-config-confirm-yes").unbind("click");
+          $("#modal-config-confirm [data-bs-dismiss=modal]").trigger({ type: "click" });
         }).done(function (data, textStatus, jqXHR) {
-          $(".modal-config-confrm-yes").unbind("click");
-          $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+          $(".modal-config-confirm-yes").unbind("click");
+          $("#modal-config-confirm [data-bs-dismiss=modal]").trigger({ type: "click" });
           updateConfigsTable();
         });
 
@@ -1016,7 +1018,7 @@ document.addEventListener("DOMContentLoaded", function () {
               </div>
               <div class="mb-3">
                 <label class="form-label">Value</label>
-                <input type="text" name="title" class="form-control" value="">
+                <input type="text" name="value" class="form-control" value="">
               </div>
           `;
           html += ` <input type="hidden" name="type" value="global">`;
@@ -1144,9 +1146,11 @@ document.addEventListener("DOMContentLoaded", function () {
         }).fail(function (jqXHR, textStatus, errorThrown) {
           let json = jqXHR.responseJSON;
           addAlert(json.message, json.detail, "ERROR");
-          $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+          $('.config-modal-add').unbind("click");
+          $("#modal-config-add [data-bs-dismiss=modal]").trigger({ type: "click" });
         }).done(function (data, textStatus, jqXHR) {
-          $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+          $('.config-modal-add').unbind("click");
+          $("#modal-config-add [data-bs-dismiss=modal]").trigger({ type: "click" });
           updateConfigsTable();
         });
 
