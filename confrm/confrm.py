@@ -1113,7 +1113,19 @@ async def get_config(response: Response, key: str = "", package: str = "", node_
             return {"value": doc["value"]}
 
     if not key:
-        return sort_configs(config.all())
+        configs = deepcopy(config.all()) # Do deepcopy to save changing database by accident
+        packages = DB.table("packages")
+        nodes = DB.table("nodes")
+        for config in configs:
+            if config["type"] == "package":
+                package_doc = packages.get(query.name == config["id"])
+                if package_doc is not None:
+                    config["package_title"] = package_doc["title"]
+            elif config["type"] == "node":
+                node_doc = nodes.get(query.node_id == config["id"])
+                if node_doc is not None:
+                    config["node_title"] = node_doc["title"]
+        return sort_configs(configs)
 
     # Must be global...
     doc = config.get((query.type == "global") &

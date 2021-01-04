@@ -227,6 +227,11 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
 
+  function redrawPackagesTable() {
+    drawn_packages = [];
+    $("#packages-table-body").html("");
+    updatePackagesTable();
+  }
 
   function updatePackagesTable() {
     let data = $.ajax({
@@ -246,23 +251,19 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         }
 
+        // Version is a list, process to first element
+        let version = "", manage_versions = "";
+        
+        if (row["versions"].length == 0) {
+          manage_versions = "disabled";
+          version = "None";
+        } else {
+          version = row["versions"][0].number;
+        }
+
         if (!is_drawn) {
 
-          // Version is a list, process to first element + info mark
-          let version = "", manage_versions = "";
-          if (row["versions"].length == 0) {
-            manage_versions = "disabled";
-            version = "None";
-          } else if (row["versions"].length == 1) {
-            version = row["versions"][0].number;
-          } else if (row["versions"].length > 1) {
-            version = row["versions"][0].number +
-              `&nbsp;
-                <svg class="icon packages-info-button" style="cursor:pointer" width="24" height="24" viewBox="0 0 24 24"
-                data-bs-toggle="modal" data-bs-target="#modal-package-info" data-package-name="` + entry + `">
-                  <use xlink:href="/static/img/all.svg#gg-info"/>
-                </svg>`;
-          }
+
           html += `<tr id="package-` + entry + `">`;
           html += `<td class="package-title">` + row["title"] + ` <span class="text-muted">(` + entry + `)</span></td>`;
           html += `<td class="package-description">` + row["description"] + `</td>`;
@@ -314,6 +315,12 @@ document.addEventListener("DOMContentLoaded", function () {
               let titleHtml = row["title"] + ` <span class="text-muted">(` + entry + `)</span>`;
               if (current !== titleHtml) {
                 $(package_row_id + " .package-" + headings[heading]).html(titleHtml);
+              }
+            } else if ("version" === headings[heading]) {
+              if (current !== version) {
+                // Version change - redraw page
+                redrawPackagesTable();
+                return;
               }
             } else if (current !== row[headings[heading]]) {
               $(package_row_id + " .package-" + headings[heading]).html(row[headings[heading]]);
@@ -841,11 +848,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
         let row = data[entry];
 
+        let id = row.id;
+
+        if ("package" === row.type && "undefined" !== typeof row.package_title) {
+          id = row.package_title + ` (` + row.id + `)`;
+        } else if("node" === row.type && "undefined" !== typeof row.node_title) {
+          id = row.node_title + ` (` + row.id + `)`;
+        }
+
         let html = "";
         html += `<tr>`;
         html += `<td class="config-key">` + row.key + `</td>`;
         html += `<td class="config-type">` + row.type + `</td>`;
-        html += `<td class="config-id">` + row.id + `</td>`;
+        html += `<td class="config-id">` + id + `</td>`;
         html += `<td class="config-value">` + row.value + `</td>`;
         html += `
           <td class="text-end">
