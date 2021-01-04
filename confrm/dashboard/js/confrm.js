@@ -697,7 +697,7 @@ document.addEventListener("DOMContentLoaded", function () {
           type: "GET"
         }).then(function (data) {
 
-          let html = `<select class="form-select nodes-change-package-selection">`;
+          let html = `<select class="form-select" name="package">`;
           for (let package in data) {
             html += `<option value="` + data[package].name + `"`;
             if (data[package].name === current_package) {
@@ -707,6 +707,7 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           html += `</select>`;
           html += ` <input type="hidden" name="type" value="package">`;
+          html += ` <input type="hidden" name="node_id" value="` + node_id + `">`;
 
           $("#modal-node .modal-body").html(html);
         });
@@ -748,42 +749,72 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         }
 
-        switch(type) {
-          case "title":
 
-            let title = "", node_id = "";
+        if ("title" == type) {
 
-            for (let input in inputs) {
-              if ("node_id" === inputs[input].name) {
-                node_id = inputs[input].value;
-              } else if("title" === inputs[input].name) {
-                title = encodeURI(inputs[input].value);
-                title = title.replace(/#/g, '%23');
-              }
+          let title = "", node_id = "";
+
+          for (let input in inputs) {
+            if ("node_id" === inputs[input].name) {
+              node_id = inputs[input].value;
+            } else if ("title" === inputs[input].name) {
+              title = encodeURI(inputs[input].value);
+              title = title.replace(/#/g, '%23');
             }
+          }
 
-            let url = "/node_title/";
-            url += "?node_id=" + node_id;
-            url += "&title=" + title;
+          let url = "/node_title/";
+          url += "?node_id=" + node_id;
+          url += "&title=" + title;
 
-            let data = $.ajax({
-              url: url,
-              type: "PUT"
-            }).fail(function (jqXHR, textStatus, errorThrown) {
-              let json = jqXHR.responseJSON;
-              addAlert(json.message, json.detail, "ERROR");
-              $(".nodes-modal-submit").unbind("click");
-              $("[data-bs-dismiss=modal]").trigger({ type: "click" });
-            }).done(function (data, textStatus, jqXHR) {
-              $(".nodes-modal-submit").unbind("click");
-              $("[data-bs-dismiss=modal]").trigger({ type: "click" });
-            });
+          let data = $.ajax({
+            url: url,
+            type: "PUT"
+          }).fail(function (jqXHR, textStatus, errorThrown) {
+            let json = jqXHR.responseJSON;
+            addAlert(json.message, json.detail, "ERROR");
+            $(".nodes-modal-submit").unbind("click");
+            $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+          }).done(function (data, textStatus, jqXHR) {
+            $(".nodes-modal-submit").unbind("click");
+            $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+          });
 
-            break;
-          case "platform":
-            break;
-          default:
-            break;
+        } else if ("package" === type) {
+
+          let node_id = "", package = "";
+
+          for (let input in inputs) {
+            if ("node_id" === inputs[input].name) {
+              node_id = inputs[input].value;
+            }
+          }
+
+          let selects = $("#modal-node .modal-body").find("select");
+
+          for (let select in selects) {
+            if ("package" === selects[select].name) {
+              package = selects[select].value;
+            }
+          }
+
+          let url = "/node_package/";
+          url += "?node_id=" + node_id;
+          url += "&package=" + package;
+
+          let data = $.ajax({
+            url: url,
+            type: "PUT"
+          }).fail(function (jqXHR, textStatus, errorThrown) {
+            let json = jqXHR.responseJSON;
+            addAlert(json.message, json.detail, "ERROR");
+            $(".nodes-modal-submit").unbind("click");
+            $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+          }).done(function (data, textStatus, jqXHR) {
+            $(".nodes-modal-submit").unbind("click");
+            $("[data-bs-dismiss=modal]").trigger({ type: "click" });
+          });
+
         }
 
       });
