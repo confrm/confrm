@@ -215,12 +215,19 @@ document.addEventListener("DOMContentLoaded", function () {
       $('.packages-delete-version').click(function (sender) {
         let package = sender.currentTarget.dataset.packageName;
         let version = sender.currentTarget.dataset.version;
+
+        let url = "/package_version/?package=" + name + "&version=" + version;
         let data = $.ajax({
-          url: "/package_version/?name=" + name + "&version=" + version,
+          url: url,
           type: "DELETE"
-        }).then(function (data) {
+        }).fail(function (jqXHR, textStatus, errorThrown) {
+          let json = jqXHR.responseJSON;
+          addAlert(json.message, json.detail, "ERROR");
+          setPackageVersionsModal(name);
+        }).done(function (data, textStatus, jqXHR) {
           setPackageVersionsModal(name);
         });
+
       });
 
     });
