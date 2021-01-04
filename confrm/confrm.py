@@ -40,7 +40,7 @@ Codes:
     022 ERROR    PUT       /node_title/             Node does not exist
     023 ERROR    PUT       /node_title/             Node title is too long
     024 ERROR    DELETE    /config/                 Key not found
-    025
+    025 ERROR    DELETE    /package/                Package not found
     026
     027
     028
@@ -586,6 +586,52 @@ async def put_package(response: Response, package: Package = Depends()):
     return {}
 
 
+@APP.delete("/package/", status_code=status.HTTP_200_OK)
+async def delete_package(name: str, response: Response):
+    """Delete a package, its versions and all configs
+
+    Attributes:
+
+        name (str): Package to be deleted
+        response (Response): Starlette response object
+    """
+
+    query = Query()
+    packages = DB.table("packages")
+    package_versions = DB.table("package_versions")
+    configs = DB.table("config")
+
+    package_doc = packages.get(query.name == name)
+    if package_doc is None:
+        msg = "Package not found"
+        logging.info(msg)
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return {
+            "error": "confrm-025",
+            "message": msg,
+            "detail": "While attempting to delete a package the package specified" +
+            " was not found"
+        }
+
+    # Get all the package versions associated with this package
+    _versions = package_versions.search(query.name == name)
+    for version in _versions:
+        version_str = str(version["major"]) + "." + \
+            str(version["minor"]) + "." + \
+            str(version["revision"])
+        await delete_package_version(name, version_str, response)
+
+    # Get all the configs associated with this package
+    _configs = configs.search((query.type == "package") &
+                                (query.id == name))
+    for config in _configs:
+        await delete_config(key=config["key"], type="package", response=response, id=name)
+
+    packages.remove(doc_ids=[package_doc.doc_id])
+
+    return {}
+
+
 @APP.post("/package_version/", status_code=status.HTTP_201_CREATED)
 async def add_package_version(
         response: Response,
@@ -698,7 +744,7 @@ async def add_package_version(
 
 
 @APP.delete("/package_version/", status_code=status.HTTP_200_OK)
-async def del_package_version(package: str, version: str, response: Response):
+async def delete_package_version(package: str, version: str, response: Response):
     """ Delete a package version
 
         Attributes:
@@ -742,7 +788,7 @@ async def del_package_version(package: str, version: str, response: Response):
         CONFIG["storage"]["data_dir"], version_entry["blob_id"])
     os.remove(file_path)
 
-    if package_doc["current_version"] == version:
+    if "current_version" in package_doc.keys() and package_doc["current_version"] == version:
         msg = "Active version is not set"
         logging.info(msg)
         response.status_code = status.HTTP_200_OK
@@ -1145,7 +1191,7 @@ async def get_config(response: Response, key: str = "", package: str = "", node_
 
 
 @APP.delete("/config/", status_code=status.HTTP_200_OK)
-async def del_config(key: str, type: str, response: Response, id: str = ""):
+async def delete_config(key: str, type: str, response: Response, id: str = ""):
     """Delete a config from the database
 
     Attributes:
