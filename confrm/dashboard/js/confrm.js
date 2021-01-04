@@ -237,6 +237,7 @@ document.addEventListener("DOMContentLoaded", function () {
   function redrawPackagesTable() {
     drawn_packages = [];
     $("#packages-table-body").html("");
+    updateMeta(meta);
     updatePackagesTable();
   }
 
@@ -246,10 +247,14 @@ document.addEventListener("DOMContentLoaded", function () {
       type: "GET"
     }).then(function (data) {
 
+      let current_packages = [];
       for (let entry in data) {
 
         let html = "";
         let row = data[entry];
+
+        // Keep track of packages we are drawing this time
+        current_packages.push(entry);
 
         let is_drawn = false;
         for (let package in drawn_packages) {
@@ -257,6 +262,7 @@ document.addEventListener("DOMContentLoaded", function () {
             is_drawn = true;
           }
         }
+
 
         // Version is a list, process to first element
         let version = "", manage_versions = "";
@@ -297,7 +303,8 @@ document.addEventListener("DOMContentLoaded", function () {
                       Enable ArduinoIDE Interface
                     </div>
                     -->
-                    <div class="dropdown-item packages-action-upload" style="cursor:pointer" data-package-name=` + entry + `>
+                    <div class="dropdown-item packages-action-delete" style="cursor:pointer" data-package-name=` + entry + `
+                    data-bs-toggle="modal" data-bs-target="#modal-package-confirm" >
                       Delete package
                     </div>
                   </div>
@@ -335,6 +342,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
           }
         }
+      }
+
+      // If drawn packages has more than current packages - then we have a missmatch...
+      if (current_packages.length != drawn_packages.length) {
+        redrawPackagesTable();
+        return;
       }
 
       $(".packages-info-button").unbind('click');
@@ -465,6 +478,53 @@ document.addEventListener("DOMContentLoaded", function () {
         });
 
         return false;
+      });
+
+      $(".packages-action-delete").unbind("click");
+      $(".packages-action-delete").click(function (sender) {
+        let name = sender.currentTarget.dataset.packageName;
+
+        let html = `Do you wish to delete package "` + name + `"? Doing so will also delete any stored versions and `;
+        html += `any configurations for this package. This action cannot be undone.`;
+        html += `<input type="hidden" name="package" value="` + name + `">`;
+
+        $("#modal-package-confirm .modal-question").html(html);
+      });
+
+      $(".modal-package-confirm-yes").unbind("click");
+      $(".modal-package-confirm-yes").click(function () {
+
+        let inputs = $("#modal-package-confirm").find("input");
+
+        let package = "";
+
+        for (let input in inputs) {
+          let val = inputs[input].value;
+          switch (inputs[input].name) {
+            case "package":
+              package = val;
+              break;
+            default:
+              break;
+          }
+        }
+
+        let url = "/package/";
+        url += "?name=" + package;
+
+        let data = $.ajax({
+          url: url,
+          type: "DELETE"
+        }).fail(function (jqXHR, textStatus, errorThrown) {
+          let json = jqXHR.responseJSON;
+          addAlert(json.message, json.detail, "ERROR");
+          $(".modal-package-confirm-yes").unbind("click");
+          $("#modal-package-confirm [data-bs-dismiss=modal]").trigger({ type: "click" });
+        }).done(function (data, textStatus, jqXHR) {
+          $(".modal-package-confirm-yes").unbind("click");
+          $("#modal-package-confirm [data-bs-dismiss=modal]").trigger({ type: "click" });
+          redrawPackagesTable();
+        });
       });
 
       $(".package-deployment-select").unbind('click');
@@ -1036,11 +1096,11 @@ document.addEventListener("DOMContentLoaded", function () {
           let html = `
               <div class="mb-3">
                 <label class="form-label">Key</label>
-                <input type="text" name="key" class="form-control" value="">
+                <input type="text" name="key" class="form-control" value="" autocomplete="off">
               </div>
               <div class="mb-3">
                 <label class="form-label">Value</label>
-                <input type="text" name="value" class="form-control" value="">
+                <input type="text" name="value" class="form-control" value="" autocomplete="off">
               </div>
           `;
           html += ` <input type="hidden" name="type" value="global">`;
@@ -1066,11 +1126,11 @@ document.addEventListener("DOMContentLoaded", function () {
             html += `
               <div class="mb-3">
                 <label class="form-label">Key</label>
-                <input type="text" name="key" class="form-control" value="">
+                <input type="text" name="key" class="form-control" value="" autocomplete="off">
               </div>
               <div class="mb-3">
                 <label class="form-label">Value</label>
-                <input type="text" name="value" class="form-control" value="">
+                <input type="text" name="value" class="form-control" value="" autocomplete="off">
               </div>
             `;
             html += ` <input type="hidden" name="type" value="package">`;
@@ -1098,11 +1158,11 @@ document.addEventListener("DOMContentLoaded", function () {
             html += `
               <div class="mb-3">
                 <label class="form-label">Key</label>
-                <input type="text" name="key" class="form-control" value="">
+                <input type="text" name="key" class="form-control" value="" autocomplete="off">
               </div>
               <div class="mb-3">
                 <label class="form-label">Value</label>
-                <input type="text" name="value" class="form-control" value="">
+                <input type="text" name="value" class="form-control" value="" autocomplete="off">
               </div>
             `;
             html += ` <input type="hidden" name="type" value="node">`;
@@ -1177,62 +1237,6 @@ document.addEventListener("DOMContentLoaded", function () {
         });
 
       });
-
-      /*
-       * Handle the user clicking submit on the general nodal for nodes
-       *//*
-      $('.nodes-modal-submit').unbind("click");
-      $('.nodes-modal-submit').click(function (sender) {
-
-        let inputs = $("#modal-node .modal-body").find("input");
-        let type = "";
-
-        for (let input in inputs) {
-          if ("type" === inputs[input].name) {
-            type = inputs[input].value;
-          }
-        }
-
-        switch(type) {
-          case "title":
-
-            let title = "", node_id = "";
-
-            for (let input in inputs) {
-              if ("node_id" === inputs[input].name) {
-                node_id = inputs[input].value;
-              } else if("title" === inputs[input].name) {
-                title = encodeURI(inputs[input].value);
-                title = title.replace(/#/g, '%23');
-              }
-            }
-
-            let url = "/node_title/";
-            url += "?node_id=" + node_id;
-            url += "&title=" + title;
-
-            let data = $.ajax({
-              url: url,
-              type: "PUT"
-            }).fail(function (jqXHR, textStatus, errorThrown) {
-              let json = jqXHR.responseJSON;
-              addAlert(json.message, json.detail, "ERROR");
-              $(".nodes-modal-submit").unbind("click");
-              $("[data-bs-dismiss=modal]").trigger({ type: "click" });
-            }).done(function (data, textStatus, jqXHR) {
-              $(".nodes-modal-submit").unbind("click");
-              $("[data-bs-dismiss=modal]").trigger({ type: "click" });
-            });
-
-            break;
-          case "platform":
-            break;
-          default:
-            break;
-        }
-
-      }); */
-
 
     });
 
