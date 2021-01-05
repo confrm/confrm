@@ -282,10 +282,11 @@ def sort_configs(configs):  # pylint: disable=R0912
 
 
 def unset_node_canary_for_package(package: str):
+    query = Query()
     nodes = DB.table("nodes")
     canaries = nodes.search(query.canary != "")
     for canary in canaries:
-        if canary["canary"]["package"] == package_version_dict["name"]:
+        if canary["canary"]["package"] == package:
             nodes.update(delete("canary"), query.node_id == canary["node_id"])
 
 

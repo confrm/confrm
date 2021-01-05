@@ -22,7 +22,7 @@ Reboot so the docker permissions are set to the user, then::
 
   sudo mkdir /var/local/confrm && chown docker:docker /var/local/confrm
 
-  docker run -d --restart=always -v /var/local/confrm:/confrm -p 8000:80 -name confrm confrm/confrm:latest
+  docker run -d --restart=always -v /var/local/confrm:/confrm -p 8000:80 --name confrm confrm/confrm:latest
 
 And then navigate to http://[pi]:8000.
 
