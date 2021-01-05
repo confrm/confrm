@@ -448,8 +448,29 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if ("immediate" === $(".package-deployment-select")[0].value) {
           url += "&set_active=true";
+          url += "&canary_next=false";
+          url += "&canary_id=";
+        } else if ("canary" === $(".package-deployment-select")[0].value) {
+          let inputs = $(".package-deployment-canary").find("input");
+          let selection = "";
+          url += "&set_active=false";
+          for (let input in inputs) {
+            if (inputs[input].checked) {
+              selection = inputs[input].value;
+            }
+          }
+          if ("next" === selection) {
+            url += "&canary_next=true";
+            url += "&canary_id=";
+          } else {
+            let canary = $(".package-deployment-canary-nodes")[0].value;
+            url += "&canary_next=false";
+            url += "&canary_id=" + canary;
+          }
         } else {
           url += "&set_active=false";
+          url += "&canary_next=false";
+          url += "&canary_id=";
         }
 
         $.ajax({
@@ -467,7 +488,7 @@ document.addEventListener("DOMContentLoaded", function () {
           $(".package-add-submit").unbind("click");
           $("#modal-package-upload [data-bs-dismiss=modal]").trigger({ type: "click" });
           updateMeta(meta);
-          showPage("packages");
+          redrawPackagesTable();
           let json = jqXHR.responseJSON;
           if ("undefined" !== typeof json.warning) {
             addAlert(json.message, json.detail, "WARNING");
@@ -475,6 +496,7 @@ document.addEventListener("DOMContentLoaded", function () {
           if ("undefined" !== typeof json.info) {
             addAlert(json.message, json.detail, "INFO");
           }
+
         });
 
         return false;

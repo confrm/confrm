@@ -41,7 +41,7 @@ Codes:
     023 ERROR    PUT       /node_title/             Node title is too long
     024 ERROR    DELETE    /config/                 Key not found
     025 ERROR    DELETE    /package/                Package not found
-    026
+    026 ERROR    POST      /package_version/        Canary node not found
     027
     028
     029
@@ -281,6 +281,14 @@ def sort_configs(configs):  # pylint: disable=R0912
     return result
 
 
+def unset_node_canary_for_package(package: str):
+    nodes = DB.table("nodes")
+    canaries = nodes.search(query.canary != "")
+    for canary in canaries:
+        if canary["canary"]["package"] == package_version_dict["name"]:
+            nodes.update(delete("canary"), query.node_id == canary["node_id"])
+
+
 # Files server in /static will point to ./dashboard (with respect to the running
 # script)
 APP.mount("/static",
@@ -414,7 +422,8 @@ async def register_node(  # pylint: disable=R0913
     # Check to see if a canary
     if "canary" in node_doc.keys():
         if node_doc["canary"]["package"] == package and node_doc["canary"]["version"] == version:
-            nodes.update(delete("canary"), query.node_id == node_id)
+            node_doc["canary"]["done"] = True
+            nodes.update(node_doc, query.node_id == node_id)
 
     return {}
 
@@ -623,7 +632,7 @@ async def delete_package(name: str, response: Response):
 
     # Get all the configs associated with this package
     _configs = configs.search((query.type == "package") &
-                                (query.id == name))
+                              (query.id == name))
     for config in _configs:
         await delete_config(key=config["key"], type="package", response=response, id=name)
 
@@ -637,6 +646,8 @@ async def add_package_version(
         response: Response,
         package_version: PackageVersion = Depends(),
         set_active: bool = False,
+        canary_next: bool = False,
+        canary_id: str = "",
         file: bytes = File(...)):
     """Uploads a package version with binary package
 
@@ -667,6 +678,20 @@ async def add_package_version(
             "detail": "While attempting to add a new package version the package name" +
             " given was not found"
         }
+
+    if canary_id:
+        nodes = DB.table("nodes")
+        node_doc = nodes.get(query.node_id == canary_id)
+        if not node_doc:
+            msg = "Package not found"
+            logging.info(msg)
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return {
+                "error": "confrm-026",
+                "message": msg,
+                "detail": "While attempting to add a new package version the package name" +
+                " given was not found"
+            }
 
     existing_version = package_versions.get((query.name == package_version_dict["name"]) &
                                             (query.major == package_version_dict["major"]) &
@@ -718,27 +743,25 @@ async def add_package_version(
     # Store in the database
     package_versions.insert(package_version_dict)
 
+    version_str = str(package_version_dict["major"]) + "." + \
+        str(package_version_dict["minor"]) + "." + \
+        str(package_version_dict["revision"])
+
     if set_active is True:
-        version = str(package_version_dict["major"]) + "." + \
-            str(package_version_dict["minor"]) + "." + \
-            str(package_version_dict["revision"])
-        package["current_version"] = version
+        package["current_version"] = version_str
         packages.update(package, query.name == package["name"])
 
-    nodes = DB.table("nodes")
-    canaries = nodes.search(query.canary != "")
-    package_canaries = []
-    for canary in canaries:
-        if canary["canary"]["package"] == package_version_dict["name"]:
-            package_canaries.append(canary)
-    if len(package_canaries) != 0:
-        return {
-            "warning": "confrm-011",
-            "msg": "Canaries are set for this package",
-            "detail": "The package version was added, however canary nodes were identified"
-            " as being configured for this package - unless manually cancelled those nodes"
-            " will update to the canary configuration"
-        }
+    # If this is begin set to active, or a canary, delete existing canaries
+    if set_active is True or canary_id:
+        unset_node_canary_for_package(package["name"])
+
+    if canary_id:
+        result = await node_package(
+            node_id=canary_id,
+            package=package_version_dict["name"],
+            version=version_str,
+            response=response)
+        print(result)
 
     return {}
 
@@ -855,7 +878,7 @@ async def check_for_update(name: str, node_id: str, response: Response):
                     "current_version": node["canary"]["version"],
                     "blob": version_doc["blob_id"],
                     "hash": version_doc["hash"],
-                    "force": True
+                    "force": not node["canary"]["done"]
                 }
 
         if "current_version" in package_doc.keys():
@@ -903,6 +926,8 @@ async def set_active_version(name: str, version: str):
 
     package_entry["current_version"] = version
     result = packages.update(package_entry, query.name == name)
+
+    unset_node_canary_for_package(name)
 
     if len(result) > 0:
         return {"ok": True}
@@ -968,7 +993,8 @@ async def node_package(node_id: str, package: str, response: Response, version: 
 
     node_doc["canary"] = {
         "package": package,
-        "version": version
+        "version": version,
+        "done": False
     }
     nodes.update(node_doc, query.node_id == node_id)
 
@@ -1159,7 +1185,8 @@ async def get_config(response: Response, key: str = "", package: str = "", node_
             return {"value": doc["value"]}
 
     if not key:
-        configs = deepcopy(config.all()) # Do deepcopy to save changing database by accident
+        # Do deepcopy to save changing database by accident
+        configs = deepcopy(config.all())
         packages = DB.table("packages")
         nodes = DB.table("nodes")
         for config in configs:
