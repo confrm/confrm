@@ -1020,7 +1020,7 @@ document.addEventListener("DOMContentLoaded", function () {
         html += `
               <div class="mb-3">
                 <label class="form-label">Value</label>
-                <input type="text" name="title" class="form-control" value="` + value + `">
+                <input type="text" name="value" class="form-control" value="` + value + `">
               </div>
         `;
 
@@ -1255,6 +1255,57 @@ document.addEventListener("DOMContentLoaded", function () {
         }).done(function (data, textStatus, jqXHR) {
           $('.config-modal-add').unbind("click");
           $("#modal-config-add [data-bs-dismiss=modal]").trigger({ type: "click" });
+          updateConfigsTable();
+        });
+
+      });
+
+
+      $('.config-modal-submit').unbind("click");
+      $('.config-modal-submit').click(function (sender) {
+
+        let inputs = $("#modal-config .modal-body").find("input");
+        let type = "";
+        let value = "";
+        let key = "";
+        let id = "";
+
+        for (let input in inputs) {
+          switch (inputs[input].name) {
+            case "type":
+              type = inputs[input].value;
+              break;
+            case "value":
+              value = encodeURI(inputs[input].value);
+              break;
+            case "key":
+              key = inputs[input].value;
+              break;
+            case "id":
+              id = inputs[input].value;
+              break;
+            default:
+              break;
+          }
+        }
+
+        let url = "/config/";
+        url += "?type=" + type;
+        url += "&key=" + key;
+        url += "&value=" + value;
+        url += "&id=" + id;
+
+        let data = $.ajax({
+          url: url,
+          type: "PUT"
+        }).fail(function (jqXHR, textStatus, errorThrown) {
+          let json = jqXHR.responseJSON;
+          addAlert(json.message, json.detail, "ERROR");
+          $('.config-modal-submit').unbind("click");
+          $("#modal-config [data-bs-dismiss=modal]").trigger({ type: "click" });
+        }).done(function (data, textStatus, jqXHR) {
+          $('.config-modal-submit').unbind("click");
+          $("#modal-config [data-bs-dismiss=modal]").trigger({ type: "click" });
           updateConfigsTable();
         });
 
