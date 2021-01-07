@@ -204,7 +204,7 @@ document.addEventListener("DOMContentLoaded", function () {
         let package = sender.currentTarget.dataset.packageName;
         let version = sender.currentTarget.dataset.version;
         let data = $.ajax({
-          url: "/set_active_version/?name=" + name + "&version=" + version,
+          url: "/set_active_version/?package=" + name + "&version=" + version,
           type: "PUT"
         }).then(function (data) {
           setPackageVersionsModal(name);

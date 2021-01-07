@@ -910,7 +910,7 @@ async def check_for_update(name: str, node_id: str, response: Response):
 
 
 @APP.put("/set_active_version/")
-async def set_active_version(name: str, version: str):
+async def set_active_version(package: str, version: str):
     """ Set the active version via the API """
     # TODO: Set error codes
 
