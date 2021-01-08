@@ -281,13 +281,109 @@ def sort_configs(configs):  # pylint: disable=R0912
     return result
 
 
-def unset_node_canary_for_package(package: str):
+def set_canary(node_id: str, package: str, version: str):
+    """Creates an entry in the canary table for this node.
+
+    If the node already exists then the previous entry will be deleted, and if an entry
+    for the package already exists then that will be deleted.
+
+    There can only be one entry per package and per node.
+
+    Attributes:
+        node_id (str): Node_id to be added
+        package (str): Package name which the node will be set to
+        version (str): Version of package the node will be set to
+    """
+
     query = Query()
-    nodes = DB.table("nodes")
-    canaries = nodes.search(query.canary != "")
-    for canary in canaries:
-        if canary["canary"]["package"] == package:
-            nodes.update(delete("canary"), query.node_id == canary["node_id"])
+    canaries = DB.table("canary")
+
+    # Check for existing node entry and delete if it exists
+    canary_list = canaries.search(query.node_id == node_id)
+    for canary in canary_list:
+        canaries.remote(doc_ids=[canary.doc_id])
+
+    # Check for existing entries for the given package, delete if exists
+    packages_list = canaries.search(query.package == package)
+    for package_doc in packages_list:
+        canaries.remote(doc_ids=[package_doc.doc_id])
+
+    # Insert new entry, force is set to True, once the node has been updated
+    canaries.insert({
+        "package": package,
+        "version": version,
+        "node_id": node_id,
+        "force": True
+    })
+
+
+def remove_canary(package: str = "", node_id: str = ""):
+    """Removes the given package or node canary entry
+
+    Exceptions:
+        ValueError("Canary Not Found")
+
+    Attributes:
+        node_id (str): Node_id to be added
+        package (str): Package name which the node will be set to
+    """
+
+    if not package and not node_id:
+        raise ValueError("Canary Not Found")
+
+    query = Query()
+    canaries = DB.table("canary")
+
+    remove_count = 0
+
+    if package:
+        package_canaries = canaries.search(query.package == package)
+        remove_count += len(package_canaries)
+        for package_doc in package_canaries:
+            canaries.remove(doc_ids=[package_doc.doc_id])
+
+    if node_id:
+        node_canaries = canaries.search(query.node_id == node_id)
+        remove_count += len(node_canaries)
+        for node_doc in node_canaries:
+            canaries.remove(doc_ids=[node_doc.doc_id])
+
+    if remove_count == 0:
+        raise ValueError("Canary Not Found")
+
+
+def get_canary(package: str = "", node_id: str = ""):
+    """Checks if a canary exists for given package or node_id
+
+    Exceptions:
+        ValueError("Input Not Set")
+
+    Attributes:
+        node_id (str): Node_id to be added
+        package (str): Package name which the node will be set to
+
+    Returns:
+        None: No entry found
+        TinyDB Document: Found entry
+    """
+
+    if not package and not node_id:
+        raise ValueError("Input Not Set")
+
+    query = Query()
+    canaries = DB.table("canary")
+
+    if package:
+        package_doc = canaries.get(query.package == package)
+        if package_doc is not None:
+            return package_doc
+
+    if node_id:
+        node_doc = canaries.get(query.node_id == node_id)
+        if node_doc is not None:
+            return node_doc
+
+    return None
 
 
 # Files server in /static will point to ./dashboard (with respect to the running
@@ -342,6 +438,29 @@ async def get_time():
         do_config()
 
     return {"time": round(time.time())}
+
+
+@APP.get("/canary/", status_code=status.HTTP_200_OK)
+async def get_canary_api(response: Response, node_id: str = ""):
+    """Helper to read back the canary status for a node
+
+    Attributes:
+        node_id (str): The node id to check against
+        response (Response): Starlette response object for setting return codes
+    """
+
+    canary = get_canary(node_id = node_id)
+    if canary is None:
+        msg = "Canary entry not found"
+        logging.info(msg)
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return {
+            "error": "confrm-022",
+            "message": msg,
+            "detail": msg
+        }
+
+    return canary
 
 
 @APP.put("/register_node/", status_code=status.HTTP_200_OK)
@@ -421,10 +540,11 @@ async def register_node(  # pylint: disable=R0913
     nodes.update(node_doc, query.node_id == node_id)
 
     # Check to see if a canary
-    if "canary" in node_doc.keys():
-        if node_doc["canary"]["package"] == package and node_doc["canary"]["version"] == version:
-            node_doc["canary"]["done"] = True
-            nodes.update(node_doc, query.node_id == node_id)
+    canary = get_canary(node_id=node_id)
+    if canary is not None:
+        canaries = DB.table("canary")
+        canary["force"] = False
+        canaries.update(canary, query.node_id == node_id)
 
     return {}
 
@@ -657,9 +777,6 @@ async def add_package_version(
         package_version (PackageVersion): Package description
         set_active (bool): Default False, if true this version will be set active
         file (bytes): File uploaded
-    Returns:
-        HTTP_201_CREATED if successful
-        HTTP_404_NOT_FOUND if package is not found
     """
 
     package_version_dict = package_version.__dict__
@@ -684,13 +801,13 @@ async def add_package_version(
         nodes = DB.table("nodes")
         node_doc = nodes.get(query.node_id == canary_id)
         if not node_doc:
-            msg = "Package not found"
+            msg = "Node not found"
             logging.info(msg)
             response.status_code = status.HTTP_404_NOT_FOUND
             return {
                 "error": "confrm-026",
                 "message": msg,
-                "detail": "While attempting to add a new package version the package name" +
+                "detail": "While attempting to add a new package version the node " +
                 " given was not found"
             }
 
@@ -710,7 +827,9 @@ async def add_package_version(
             " was found to be already used"
         }
 
-    if package_version_dict["major"] < 0 or package_version_dict["minor"] < 0 or package_version_dict["revision"] < 0:
+    if package_version_dict["major"] < 0 or \
+            package_version_dict["minor"] < 0 or \
+            package_version_dict["revision"] < 0:
         msg = "Version number elements cannot be negative"
         logging.info(msg)
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -754,15 +873,16 @@ async def add_package_version(
 
     # If this is begin set to active, or a canary, delete existing canaries
     if set_active is True or canary_id:
-        unset_node_canary_for_package(package["name"])
+        try:
+            remove_canary(package=package["name"])
+        except ValueError as err:
+            if str(err) != "Canary Not Found":
+                raise
 
     if canary_id:
-        result = await node_package(
-            node_id=canary_id,
-            package=package_version_dict["name"],
-            version=version_str,
-            response=response)
-        print(result)
+        set_canary(node_id=canary_id,
+                   package=package["name"],
+                   version=version_str)
 
     return {}
 
@@ -811,6 +931,13 @@ async def delete_package_version(package: str, version: str, response: Response)
     file_path = os.path.join(
         CONFIG["storage"]["data_dir"], version_entry["blob_id"])
     os.remove(file_path)
+
+    # Check for any hanging canary entries
+    try:
+        remove_canary(package=package)
+    except ValueError as err:
+        if str(err) != "Canary Not Found":
+            raise
 
     if "current_version" in package_doc.keys() and package_doc["current_version"] == version:
         msg = "Active version is not set"
@@ -866,32 +993,7 @@ async def check_for_update(name: str, node_id: str, response: Response):
     query = Query()
 
     package_doc = packages.get(query.name == name)
-    if package_doc is not None:
-
-        # Check to see if there is a canary entry for this node
-        node = nodes.get(query.node_id == node_id)
-        if node is not None:
-            if "canary" in node.keys():
-                version_doc = get_package_version_by_version_string(
-                    node["canary"]["package"],
-                    node["canary"]["version"])
-                return {
-                    "current_version": node["canary"]["version"],
-                    "blob": version_doc["blob_id"],
-                    "hash": version_doc["hash"],
-                    "force": not node["canary"]["done"]
-                }
-
-        if "current_version" in package_doc.keys():
-            version_entry = get_package_version_by_version_string(
-                name,
-                package_doc["current_version"])
-            return {
-                "current_version": package_doc["current_version"],
-                "blob": version_entry["blob_id"],
-                "hash": version_entry["hash"],
-                "force": False
-            }
+    if package_doc is None:
 
         response.status_code = status.HTTP_404_NOT_FOUND
         return {
@@ -901,12 +1003,34 @@ async def check_for_update(name: str, node_id: str, response: Response):
             "however there are no available versions of that package"
         }
 
-    response.status_code = status.HTTP_404_NOT_FOUND
-    return {
-        "error": "confrm-002",
-        "message": "Package not found",
-        "detail": "While checking for updates the package was not found in the database."
-    }
+    # Check to see if there is a canary entry for this node
+    canary = get_canary(node_id=node_id)
+    if canary is not None:
+        version_doc = get_package_version_by_version_string(
+            canary["package"],
+            canary["version"]
+        )
+        if version_doc is None:
+            logging.error("Canary version not set, removing canary entry...")
+            remove_canary(node_id=node_id)
+        else:
+            return {
+                "current_version": canary["version"],
+                "blob": version_doc["blob_id"],
+                "hash": version_doc["hash"],
+                "force": canary["force"]
+            }
+
+    if "current_version" in package_doc.keys():
+        version_entry = get_package_version_by_version_string(
+            name,
+            package_doc["current_version"])
+        return {
+            "current_version": package_doc["current_version"],
+            "blob": version_entry["blob_id"],
+            "hash": version_entry["hash"],
+            "force": False
+        }
 
 
 @APP.put("/set_active_version/")
@@ -917,18 +1041,22 @@ async def set_active_version(package: str, version: str):
     query = Query()
     packages = DB.table("packages")
 
-    package_entry = packages.get(query.name == name)
+    package_entry = packages.get(query.name == package)
     if package_entry is None:
         return {"ok": False, "info": "Package does not exist"}
 
-    version_doc = get_package_version_by_version_string(name, version)
+    version_doc = get_package_version_by_version_string(package, version)
     if len(version_doc) < 1:
         return {"ok": False, "info": "Specified version does not exist for package"}
 
     package_entry["current_version"] = version
-    result = packages.update(package_entry, query.name == name)
+    result = packages.update(package_entry, query.name == package)
 
-    unset_node_canary_for_package(name)
+    try:
+        remove_canary(package=package)
+    except ValueError as err:
+        if str(err) != "Canary Not Found":
+            raise
 
     if len(result) > 0:
         return {"ok": True}
@@ -992,12 +1120,7 @@ async def node_package(node_id: str, package: str, response: Response, version: 
             " was not found"
         }
 
-    node_doc["canary"] = {
-        "package": package,
-        "version": version,
-        "done": False
-    }
-    nodes.update(node_doc, query.node_id == node_id)
+    set_canary(package=package, version=version, node_id=node_id)
 
     return {}
 

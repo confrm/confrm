@@ -453,8 +453,14 @@ def test_put_node_package_via_package_version():
                                   "&title=Good%20Name" +
                                   "&platform=esp32")
             assert response.status_code == 201
+            response = client.put("/package/" +
+                    "?name=package_b" +
+                                  "&description=some%20description" +
+                                  "&title=Good%20Name" +
+                                  "&platform=esp32")
+            assert response.status_code == 201
 
-            # Add active version to package with node set
+            # Add active version to package
             with open(test_file, "rb") as file_ptr:
                 response = client.post("/package_version/" +
                                        "?name=package_a" +
@@ -473,7 +479,15 @@ def test_put_node_package_via_package_version():
                                   "&description=some%20description" +
                                   "&platform=esp32")
             assert response.status_code == 200
-                
+
+            ###################################################################
+            ## To start with the registered node should get the active verion
+            ## for package_a.
+            ##
+            ## Once a version is added for package_b and the node is set as the
+            ## canary, then the package_b version should be returned
+            ###################################################################
+
             # Check for update
             response = client.get("/check_for_update/" +
                                   "?node_id=0:12:3:4" +
@@ -481,10 +495,10 @@ def test_put_node_package_via_package_version():
             assert response.status_code == 200
             assert response.json()["current_version"] == "0.1.0"
 
-            # Add active version to package with the canary node set
+            # Add active version to package_b with the canary node set
             with open(test_file, "rb") as file_ptr:
                 response = client.post("/package_version/" +
-                                       "?name=package_a" +
+                                       "?name=package_b" +
                                        "&major=0" +
                                        "&minor=2" +
                                        "&revision=0" +
@@ -502,22 +516,39 @@ def test_put_node_package_via_package_version():
             assert response.json()["force"]
 
             # Re-Register a node with confrm using the forced package
-            # this should reset the tag forcing the version
             response = client.put("/register_node/" +
                                   "?node_id=0:12:3:4" +
-                                  "&package=package_a" +
+                                  "&package=package_b" +
                                   "&version=0.2.0" +
                                   "&description=some%20description" +
                                   "&platform=esp32")
             assert response.status_code == 200
 
-            # Check for update (will be a package with version 0.1.0) TODO (with canary logic fix)
-            #response = client.get("/check_for_update/" +
-            #                      "?node_id=0:12:3:4" +
-            #                      "&name=package_a")
-            #assert response.status_code == 200
-            #assert response.json()["current_version"] == "0.1.0"
-            #assert not response.json()["force"]
+            # Check for update (will be a package with version 0.2.0, but not forced)
+            response = client.get("/check_for_update/" +
+                                  "?node_id=0:12:3:4" +
+                                  "&name=package_b")
+            assert response.status_code == 200
+            assert response.json()["current_version"] == "0.2.0"
+            assert not response.json()["force"]
+
+            # Get canary will still report that it is a canary
+            response = client.get("/canary/" +
+                                  "?node_id=0:12:3:4")
+            assert response.status_code == 200
+            assert response.json()["package"] == "package_b"
+            assert response.json()["version"] == "0.2.0"
+
+            # Setting the active version for package_b will clear the canary
+            response = client.put("/set_active_version/" +
+                                  "?package=package_b" +
+                                  "&version=0.2.0")
+            assert response.status_code == 200
+
+            # Get canary will still report that it is a canary
+            response = client.get("/canary/" +
+                                  "?node_id=0:12:3:4")
+            assert response.status_code == 404
 
 
 def test_put_node_package():
@@ -594,7 +625,7 @@ def test_put_node_package():
                                   "&package=package_b")
             assert response.status_code == 200
 
-            # Check for update (will be a package with version 0.2.0)
+            # Check for update (will be package_b with version 0.2.0)
             response = client.get("/check_for_update/" +
                                   "?node_id=0:12:3:4" +
                                   "&name=package_a")
@@ -602,8 +633,7 @@ def test_put_node_package():
             assert response.json()["current_version"] == "0.2.0"
             assert response.json()["force"]
 
-            # Put in a newer package versions for the packages, set as active
-            # should have no effect on the canary
+            # Put in a newer package versions for the packages, set as active - will overwrite canary
             with open(test_file, "rb") as file_ptr:
                 response = client.post("/package_version/" +
                                        "?name=package_a" +
@@ -624,47 +654,14 @@ def test_put_node_package():
                                        files={"file": ("filename", file_ptr, "application/binary")})
                 assert response.status_code == 201
 
-            # Check for update (will be a force to package_b with version 0.2.0) TODO, this is not true as confrm does
-            # not know that this canary has not gone off, so setting package_b above will override this...
+            # Check for update - should be back to package_a with 0.0.1, not forced
             response = client.get("/check_for_update/" +
                                   "?node_id=0:12:3:4" +
                                   "&name=package_a")
             assert response.status_code == 200
             assert response.json()["current_version"] == "0.1.1"
-            #assert response.json()["force"]
-
-            # Re-Register a node with confrm using the forced package
-            # this should reset the tag forcing the version
-            response = client.put("/register_node/" +
-                                  "?node_id=0:12:3:4" +
-                                  "&package=package_b" +
-                                  "&version=0.2.0" +
-                                  "&description=some%20description" +
-                                  "&platform=esp32")
-            assert response.status_code == 200
-
-            # Check for update (will be a package with version 0.2.1)
-            response = client.get("/check_for_update/" +
-                                  "?node_id=0:12:3:4" +
-                                  "&name=package_b")
-            assert response.status_code == 200
-            assert response.json()["current_version"] == "0.2.1"
             assert not response.json()["force"]
 
-            # Force to use different package, non-existing version
-            response = client.put("/node_package/" +
-                                  "?node_id=0:12:3:4" +
-                                  "&package=package_b" +
-                                  "&version=1.0.0")
-            assert response.status_code == 404
-            assert response.json()["error"] == "confrm-018"
-
-            # Force to use different package, existing version
-            response = client.put("/node_package/" +
-                                  "?node_id=0:12:3:4" +
-                                  "&package=package_b" +
-                                  "&version=0.2.0")
-            assert response.status_code == 200
 
 
 def test_config():
