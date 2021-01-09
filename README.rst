@@ -5,11 +5,13 @@ Confrm
 
 Confrm is an application designed to make it easy to deploy IOT type applications across your network.
 
+Go to https://confrm.io/ to find quckstart guides and more information.
+
 It uses a Python based server to host application binaries, which connected IOT devices can poll for updates and configuration information.
 
 Currently supported platforms are:
 
-* ESP32
+* ESP32 - https://github.com/confrm/confrm-arduino-esp32/
 
 To build and run the sever as a service on a raspberry pi::
 
@@ -25,6 +27,7 @@ Reboot so the docker permissions are set to the user, then::
   docker run -d --restart=always -v /var/local/confrm:/confrm -p 8000:80 --name confrm confrm/confrm:latest
 
 And then navigate to http://[pi]:8000.
+
 
 ----
 
