@@ -3,7 +3,7 @@ name: Confrm Test/Deploy
 on: [push]
 
 jobs:
-  test:
+  test-server:
 
     runs-on: ubuntu-latest
     strategy:
@@ -30,6 +30,21 @@ jobs:
     - name: Test with pytest
       run: |
         pytest
+
+  test-client:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Python
+        uses: action/setup-python@v2
+        with:
+          python-version: 3.8
+      - name: Install platform.io
+        run: |
+          pip install platformio
+
 
   deploy:
     runs-on: ubuntu-latest
