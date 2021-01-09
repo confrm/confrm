@@ -909,7 +909,7 @@ async def add_package_version(
         packages.update(package_doc, query.name == package_doc["name"])
 
     # If this is begin set to active, or a canary, delete existing canaries
-    if set_active is True or canary_id:
+    if set_active is True or canary_id or canary_next is True:
         try:
             remove_canary(package=package_doc["name"])
         except ValueError as err:
@@ -918,6 +918,11 @@ async def add_package_version(
 
     if canary_id:
         set_canary(node_id=canary_id,
+                   package=package_doc["name"],
+                   version=version_str)
+
+    if canary_next:
+        set_canary(node_id="*",
                    package=package_doc["name"],
                    version=version_str)
 
@@ -993,7 +998,7 @@ async def get_package(name: str, response: Response, lite: bool = False):
 
 
 @APP.get("/check_for_update/", status_code=status.HTTP_200_OK)
-async def check_for_update(name: str, node_id: str, response: Response):
+async def check_for_update(package: str, node_id: str, response: Response):
     """Called by node wanting to know if an update is available
 
     Will return the most recent package version for the given package name.
@@ -1001,7 +1006,7 @@ async def check_for_update(name: str, node_id: str, response: Response):
     the be canary settings will be returned.
 
     Arguments:
-        name (str): Package to check for update for
+        package (str): Package to check for update for
         node_id (str): Id of the node making the request, or empty
         response (Response): Starlette response object for setting return codes
     Returns:
@@ -1013,7 +1018,7 @@ async def check_for_update(name: str, node_id: str, response: Response):
 
     query = Query()
 
-    package_doc = packages.get(query.name == name)
+    package_doc = packages.get(query.name == package)
     if package_doc is None:
 
         response.status_code = status.HTTP_404_NOT_FOUND
@@ -1023,6 +1028,11 @@ async def check_for_update(name: str, node_id: str, response: Response):
             "detail": "While checking for updates the package was found in the database, " +
             "however there are no available versions of that package"
         }
+
+    package_canary = get_canary(package=package)
+    print(package_canary)
+    if package_canary is not None and package_canary["node_id"] == "*":
+        set_canary(node_id=node_id, package=package, version=package_canary["version"])
 
     # Check to see if there is a canary entry for this node
     canary = get_canary(node_id=node_id)
@@ -1044,7 +1054,7 @@ async def check_for_update(name: str, node_id: str, response: Response):
 
     if "current_version" in package_doc.keys():
         version_entry = get_package_version_by_version_string(
-            name,
+                package,
             package_doc["current_version"])
         return {
             "current_version": package_doc["current_version"],

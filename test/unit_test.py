@@ -491,7 +491,7 @@ def test_put_node_package_via_package_version():
             # Check for update
             response = client.get("/check_for_update/" +
                                   "?node_id=0:12:3:4" +
-                                  "&name=package_a")
+                                  "&package=package_a")
             assert response.status_code == 200
             assert response.json()["current_version"] == "0.1.0"
 
@@ -510,7 +510,7 @@ def test_put_node_package_via_package_version():
             # Check for update (will be a package with version 0.2.0)
             response = client.get("/check_for_update/" +
                                   "?node_id=0:12:3:4" +
-                                  "&name=package_a")
+                                  "&package=package_a")
             assert response.status_code == 200
             assert response.json()["current_version"] == "0.2.0"
             assert response.json()["force"]
@@ -527,7 +527,7 @@ def test_put_node_package_via_package_version():
             # Check for update (will be a package with version 0.2.0, but not forced)
             response = client.get("/check_for_update/" +
                                   "?node_id=0:12:3:4" +
-                                  "&name=package_b")
+                                  "&package=package_b")
             assert response.status_code == 200
             assert response.json()["current_version"] == "0.2.0"
             assert not response.json()["force"]
@@ -615,7 +615,7 @@ def test_put_node_package():
             # Check for update
             response = client.get("/check_for_update/" +
                                   "?node_id=0:12:3:4" +
-                                  "&name=package_a")
+                                  "&package=package_a")
             assert response.status_code == 200
             assert response.json()["current_version"] == "0.1.0"
 
@@ -628,7 +628,7 @@ def test_put_node_package():
             # Check for update (will be package_b with version 0.2.0)
             response = client.get("/check_for_update/" +
                                   "?node_id=0:12:3:4" +
-                                  "&name=package_a")
+                                  "&package=package_a")
             assert response.status_code == 200
             assert response.json()["current_version"] == "0.2.0"
             assert response.json()["force"]
@@ -657,7 +657,7 @@ def test_put_node_package():
             # Check for update - should be back to package_a with 0.0.1, not forced
             response = client.get("/check_for_update/" +
                                   "?node_id=0:12:3:4" +
-                                  "&name=package_a")
+                                  "&package=package_a")
             assert response.status_code == 200
             assert response.json()["current_version"] == "0.1.1"
             assert not response.json()["force"]
