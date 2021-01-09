@@ -1031,3 +1031,42 @@ def test_put_node_title():
                                   "?node_id=0:12:3:4")
             assert response.status_code == 200
             assert response.json()["title"] == "Good Name"
+
+
+def test_register_node():
+    """Tests registering a node"""
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        config_file = os.path.join(data_dir, CONFIG_NAME)
+        with open(config_file, "w") as file:
+            file.write(get_config_file(data_dir))
+        os.environ["CONFRM_CONFIG"] = config_file
+
+        with TestClient(APP) as client:
+
+            # Create a package
+            response = client.put("/package/" +
+                                  "?name=package_a" +
+                                  "&description=some%20description" +
+                                  "&title=Good%20Name" +
+                                  "&platform=esp32")
+            assert response.status_code == 201
+
+            # Register a node with confrm
+            response = client.put("/register_node/" +
+                                  "?node_id=0:12:3:4" +
+                                  "&package=package_a" +
+                                  "&version=" +
+                                  "&description=some%20description" +
+                                  "&platform=esp32")
+            assert response.status_code == 200
+
+
+            # Register a node with invalid id
+            response = client.put("/register_node/" +
+                                  "?node_id=*" +
+                                  "&package=package_a" +
+                                  "&version=" +
+                                  "&description=some%20description" +
+                                  "&platform=esp32")
+            assert response.status_code == 400

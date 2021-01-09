@@ -21,7 +21,7 @@ Codes:
     002 ERROR
     003 ERROR    PUT         /package/               Package already exists
     004 ERROR    PUT         /package/               Package name cannot be empty
-    005
+    005 ERROR    PUT         /register_node/         Node id is invalid
     006 ERROR    PUT         /package_version/       Version already exists for package
     007
     008 ERROR    PUT         /node_package/          Package has no active version
@@ -41,7 +41,7 @@ Codes:
     022 ERROR    PUT         /node_title/            Node does not exist
     023 ERROR    PUT         /node_title/            Node title is too long
     024 ERROR    DELETE      /config/                Key not found
-    025
+    025 
     026 ERROR    POST        /package_version/       Canary node not found
     027
     028
@@ -529,10 +529,8 @@ async def register_node(  # pylint: disable=R0913
         HTTP_404_NOT_FOUND
     """
 
-    packages = DB.table("packages")
-    nodes = DB.table("nodes")
-
     query = Query()
+    nodes = DB.table("nodes")
 
     # Make sure input is sane
     node_id = escape(node_id)
@@ -540,6 +538,18 @@ async def register_node(  # pylint: disable=R0913
     version = escape(version)
     description = escape(description)
     platform = escape(platform)
+
+    # Asterisk is not allowed!
+    if node_id == "*":
+        msg = "Node id is invalid"
+        logging.info(msg)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {
+            "error": "confrm-005",
+            "message": msg,
+            "detail": "A node attempted to register with an invalid node_id"
+        }
+
 
     (package_doc, status_code, err) = package_exists(package)
     if package_doc is None:
@@ -924,9 +934,6 @@ async def delete_package_version(package: str, version: str, response: Response)
             version (str): Version to be deleted
             response (Response): Starlette response object
     """
-
-    packages = DB.table("packages")
-    query = Query()
 
     (package_doc, status_code, err) = package_exists(package)
     if package_doc is None:
@@ -1395,4 +1402,4 @@ async def delete_config(key: str, type: str, response: Response, id: str = ""):
                 " unable to delete it"
             }
 
-            return {}
+    return {}
