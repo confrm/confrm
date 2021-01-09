@@ -307,7 +307,7 @@ def set_canary(node_id: str, package: str, version: str):
     # Check for existing entries for the given package, delete if exists
     packages_list = canaries.search(query.package == package)
     for package_doc in packages_list:
-        canaries.remote(doc_ids=[package_doc.doc_id])
+        canaries.remove(doc_ids=[package_doc.doc_id])
 
     # Insert new entry, force is set to True, once the node has been updated
     canaries.insert({
@@ -549,7 +549,6 @@ async def register_node(  # pylint: disable=R0913
             "message": msg,
             "detail": "A node attempted to register with an invalid node_id"
         }
-
 
     node_doc = nodes.get(query.node_id == node_id)
     if node_doc is None:
@@ -1010,22 +1009,9 @@ async def check_for_update(package: str, node_id: str, response: Response):
     """
 
     packages = DB.table("packages")
-
     query = Query()
 
-    package_doc = packages.get(query.name == package)
-    if package_doc is None:
-
-        response.status_code = status.HTTP_404_NOT_FOUND
-        return {
-            "error": "confrm-011",
-            "message": "No versions found for package",
-            "detail": "While checking for updates the package was found in the database, " +
-            "however there are no available versions of that package"
-        }
-
     package_canary = get_canary(package=package)
-    print(package_canary)
     if package_canary is not None and package_canary["node_id"] == "*":
         set_canary(node_id=node_id, package=package, version=package_canary["version"])
 
@@ -1047,6 +1033,16 @@ async def check_for_update(package: str, node_id: str, response: Response):
                 "force": canary["force"]
             }
 
+    package_doc = packages.get(query.name == package)
+    if package_doc is None:
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return {
+            "error": "confrm-000",
+            "message": "Package not found",
+            "detail": "Package not found"
+        }
+
+
     if "current_version" in package_doc.keys():
         version_entry = get_package_version_by_version_string(
                 package,
@@ -1057,6 +1053,14 @@ async def check_for_update(package: str, node_id: str, response: Response):
             "hash": version_entry["hash"],
             "force": False
         }
+
+    response.status_code = status.HTTP_404_NOT_FOUND
+    return {
+       "error": "confrm-011",
+       "message": "No versions found for package",
+       "detail": "While checking for updates the package was found in the database, " +
+       "however there are no available versions of that package"
+       }
 
 
 @APP.put("/set_active_version/")
