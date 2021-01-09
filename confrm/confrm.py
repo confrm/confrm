@@ -16,32 +16,33 @@ limitations under the License.
 
 Codes:
 
-    001 ERROR   GET         /check_for_update/      No versions found for package
-    002 ERROR   GET         /check_for_update/      Package not found
-    003 ERROR   PUT         /package/               Package already exists
-    004 ERROR   PUT         /package/               Package name cannot be empty
-    005 ERROR   PUT         /package_version/       Package not found
-    006
+    000 ERROR    -           -                       Package not found
+    001 ERROR    -           -                       Node not found
+    002 ERROR
+    003 ERROR    PUT         /package/               Package already exists
+    004 ERROR    PUT         /package/               Package name cannot be empty
+    005
+    006 ERROR    PUT         /package_version/       Version already exists for package
     007
-    008
+    008 ERROR    PUT         /node_package/          Package has no active version
     009
-    010
-    011
-    012
+    010 ERROR    PUT         /package/               Package name does not match pattern
+    011 ERROR    GET         /check_for_update/      No versions found for package
+    012 ERROR    GET         /config/                Key not found
     013
     014
     015
-    016
-    017  Version numbers cannot be negative
-    018 ERROR    PUT       /node_package/           Package version not found
-    019 ERROR    DELETE    /package_version/        Package not found
-    020 ERROR    DELETE    /package_version/        Package version not found
-    021 WARNING  DELETE    /package_version/        Active version not set
-    022 ERROR    PUT       /node_title/             Node does not exist
-    023 ERROR    PUT       /node_title/             Node title is too long
-    024 ERROR    DELETE    /config/                 Key not found
-    025 ERROR    DELETE    /package/                Package not found
-    026 ERROR    POST      /package_version/        Canary node not found
+    016 ERROR    PUT         /config/                Key name does not match pattern
+    017 ERROR    POST        /package_version/       Version numbers cannot be negative
+    018 ERROR    PUT         /node_package/          Package version not found
+    019
+    020 ERROR    DELETE      /package_version/       Package version not found
+    021 WARNING  DELETE      /package_version/       Active version not set
+    022 ERROR    PUT         /node_title/            Node does not exist
+    023 ERROR    PUT         /node_title/            Node title is too long
+    024 ERROR    DELETE      /config/                Key not found
+    025
+    026 ERROR    POST        /package_version/       Canary node not found
     027
     028
     029
@@ -386,6 +387,46 @@ def get_canary(package: str = "", node_id: str = ""):
     return None
 
 
+def package_exists(package: str):
+    """ Checks if package exists, returns tuple of (package_doc, status, error_dict)
+
+    Attributes:
+        packages (str): Package to search for
+    """
+    query = Query()
+    packages = DB.table("packages")
+
+    package_doc = packages.get(query.name == package)
+    if package_doc is None:
+        msg = "Package not found"
+        return (None, status.HTTP_404_NOT_FOUND,{
+            "error": "confrm-000",
+            "message": msg,
+            "detail": "The package specified was not found"
+        })
+    return (package_doc, None, None)
+
+
+def node_exists(node_id: str):
+    """ Checks if node exists, returns tuple of (node_doc, status, error_dict)
+
+    Attributes:
+        packages (str): Package to search for
+    """
+    query = Query()
+    nodes = DB.table("nodes")
+
+    node_doc = nodes.get(query.node_id == node_id)
+    if node_doc is None:
+        msg = "Node not found"
+        return (None, status.HTTP_404_NOT_FOUND,{
+            "error": "confrm-001",
+            "message": msg,
+            "detail": "The node specified was not found"
+        })
+    return (node_doc, None, None)
+
+
 # Files server in /static will point to ./dashboard (with respect to the running
 # script)
 APP.mount("/static",
@@ -500,10 +541,10 @@ async def register_node(  # pylint: disable=R0913
     description = escape(description)
     platform = escape(platform)
 
-    package_doc = packages.get(query.name == package)
+    (package_doc, status_code, err) = package_exists(package)
     if package_doc is None:
-        response.status_code = status.HTTP_404_NOT_FOUND
-        return {"info": "Unknown package name"}  # TODO: Set errorno
+        response.status_code = status_code
+        return err
 
     node_doc = nodes.get(query.node_id == node_id)
     if node_doc is None:
@@ -731,17 +772,10 @@ async def delete_package(name: str, response: Response):
     package_versions = DB.table("package_versions")
     configs = DB.table("config")
 
-    package_doc = packages.get(query.name == name)
+    (package_doc, status_code, err) = package_exists(name)
     if package_doc is None:
-        msg = "Package not found"
-        logging.info(msg)
-        response.status_code = status.HTTP_404_NOT_FOUND
-        return {
-            "error": "confrm-025",
-            "message": msg,
-            "detail": "While attempting to delete a package the package specified" +
-            " was not found"
-        }
+        response.status_code = status_code
+        return err
 
     # Get all the package versions associated with this package
     _versions = package_versions.search(query.name == name)
@@ -785,17 +819,10 @@ async def add_package_version(
     package_versions = DB.table("package_versions")
     query = Query()
 
-    package = packages.get(query.name == package_version_dict["name"])
-    if package is None:
-        msg = "Package not found"
-        logging.info(msg)
-        response.status_code = status.HTTP_404_NOT_FOUND
-        return {
-            "error": "confrm-005",
-            "message": msg,
-            "detail": "While attempting to add a new package version the package name" +
-            " given was not found"
-        }
+    (package_doc, status_code, err) = package_exists(package_version_dict["name"])
+    if package_doc is None:
+        response.status_code = status_code
+        return err
 
     if canary_id:
         nodes = DB.table("nodes")
@@ -868,20 +895,20 @@ async def add_package_version(
         str(package_version_dict["revision"])
 
     if set_active is True:
-        package["current_version"] = version_str
-        packages.update(package, query.name == package["name"])
+        package_doc["current_version"] = version_str
+        packages.update(package_doc, query.name == package_doc["name"])
 
     # If this is begin set to active, or a canary, delete existing canaries
     if set_active is True or canary_id:
         try:
-            remove_canary(package=package["name"])
+            remove_canary(package=package_doc["name"])
         except ValueError as err:
             if str(err) != "Canary Not Found":
                 raise
 
     if canary_id:
         set_canary(node_id=canary_id,
-                   package=package["name"],
+                   package=package_doc["name"],
                    version=version_str)
 
     return {}
@@ -901,17 +928,10 @@ async def delete_package_version(package: str, version: str, response: Response)
     packages = DB.table("packages")
     query = Query()
 
-    package_doc = packages.get(query.name == package)
+    (package_doc, status_code, err) = package_exists(package)
     if package_doc is None:
-        msg = "Package not found"
-        logging.info(msg)
-        response.status_code = status.HTTP_404_NOT_FOUND
-        return {
-            "error": "confrm-019",
-            "message": msg,
-            "detail": "While attempting to delete a package version the package specified" +
-            " was not found"
-        }
+        response.status_code = status_code
+        return err
 
     package_versions = DB.table("package_versions")
     version_entry = get_package_version_by_version_string(package, version)
@@ -957,17 +977,12 @@ async def delete_package_version(package: str, version: str, response: Response)
 @APP.get("/package/", status_code=status.HTTP_200_OK)
 async def get_package(name: str, response: Response, lite: bool = False):
     """ Returns the package information, including URL for download """
-    if CONFIG is None:
-        do_config()
 
-    packages = DB.table("packages")
-    query = Query()
-    package = packages.get(query.name == name)
-    if package is not None:
-        return format_package_info(package, lite)
-
-    response.status_code = status.HTTP_404_NOT_FOUND
-    return {}
+    (package_doc, status_code, err) = package_exists(name)
+    if package_doc is None:
+        response.status_code = status_code
+        return err
+    return format_package_info(package_doc, lite)
 
 
 @APP.get("/check_for_update/", status_code=status.HTTP_200_OK)
@@ -988,7 +1003,6 @@ async def check_for_update(name: str, node_id: str, response: Response):
     """
 
     packages = DB.table("packages")
-    nodes = DB.table("nodes")
 
     query = Query()
 
@@ -997,7 +1011,7 @@ async def check_for_update(name: str, node_id: str, response: Response):
 
         response.status_code = status.HTTP_404_NOT_FOUND
         return {
-            "error": "confrm-001",
+            "error": "confrm-011",
             "message": "No versions found for package",
             "detail": "While checking for updates the package was found in the database, " +
             "however there are no available versions of that package"
@@ -1067,21 +1081,10 @@ async def set_active_version(package: str, version: str):
 async def node_package(node_id: str, package: str, response: Response, version: str = ""):
     """Force a node to use a particular package using canary feature"""
 
-    query = Query()
-    packages = DB.table("packages")
-    nodes = DB.table("nodes")
-
-    package_doc = packages.get(query.name == package)
+    (package_doc, status_code, err) = package_exists(package)
     if package_doc is None:
-        msg = "Package not found"
-        logging.info(msg)
-        response.status_code = status.HTTP_404_NOT_FOUND
-        return {
-            "error": "confrm-007",
-            "message": msg,
-            "detail": "While attempting to set a node to use a particular package the package" +
-            " name given was not found"
-        }
+        response.status_code = status_code
+        return err
 
     if not version:
         if not package_doc["current_version"]:
@@ -1108,39 +1111,30 @@ async def node_package(node_id: str, package: str, response: Response, version: 
                 " version given was not found"
             }
 
-    node_doc = nodes.get(query.node_id == node_id)
+    (node_doc, status_code, err) = node_exists(node_id)
     if node_doc is None:
-        msg = "Node not found"
-        logging.info(msg)
-        response.status_code = status.HTTP_404_NOT_FOUND
-        return {
-            "error": "confrm-009",
-            "message": msg,
-            "detail": "While attempting to set a node to use a particular package the node" +
-            " was not found"
-        }
+        response.status_code = status_code
+        return err
 
     set_canary(package=package, version=version, node_id=node_id)
 
     return {}
 
 
-@APP.get("/blob/")
-async def get_blob(name: str, blob: str):
+@APP.get("/blob/", status_code=status.HTTP_200_OK)
+async def get_blob(package: str, blob: str, response: Response):
     """ Set a blob file """
-    if CONFIG is None:
-        do_config()
 
     query = Query()
-    packages = DB.table("packages")
     package_versions = DB.table("package_versions")
 
-    package_entry = packages.get(query.name == name)
-    if package_entry is None:
-        return {"ok": False, "info": "Package does not exist"}
+    (package_doc, status_code, err) = package_exists(package)
+    if package_doc is None:
+        response.status_code = status_code
+        return err
 
     version_entry = package_versions.get(
-        query.name == name and
+        query.name == package and
         query.blob_id == blob)
     if version_entry is None:
         return {"ok": False, "info": "Specified blob does not exist for package"}
@@ -1174,8 +1168,6 @@ async def put_config(type: str, key: str, value: str, response: Response, id: st
 
     query = Query()
     config = DB.table("config")
-    packages = DB.table("packages")
-    nodes = DB.table("nodes")
 
     types = ["global", "package", "node"]
 
@@ -1219,17 +1211,10 @@ async def put_config(type: str, key: str, value: str, response: Response, id: st
             config.insert(config_doc)
 
     elif type == "package":
-        package_doc = packages.get(query.name == id)
+        (package_doc, status_code, err) = package_exists(id)
         if package_doc is None:
-            msg = "Package does not exist"
-            logging.info(msg)
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return {
-                "error": "confrm-013",
-                "message": msg,
-                "detail": "While attempting to add a new config for a package the package name "
-                " given does not match any existing packages"
-            }
+            response.status_code = status_code
+            return err
 
         key_doc = config.get((query.key == key) &
                              (query.type == "package") &
@@ -1247,18 +1232,10 @@ async def put_config(type: str, key: str, value: str, response: Response, id: st
             config.insert(config_doc)
 
     elif type == "node":
-
-        node_doc = nodes.get(query.node_id == id)
+        (node_doc, status_code, err) = node_exists(id)
         if node_doc is None:
-            msg = "Node does not exist"
-            logging.info(msg)
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return {
-                "error": "confrm-014",
-                "message": msg,
-                "detail": "While attempting to add a new config for a node the node_id does not "
-                " match any known node_id"
-            }
+            response.status_code = status_code
+            return err
 
         key_doc = config.get((query.key == key) &
                              (query.type == "node") &
@@ -1295,6 +1272,10 @@ async def get_config(response: Response, key: str = "", package: str = "", node_
     config = DB.table("config")
 
     if node_id:
+        (doc, status_code, err) = node_exists(node_id)
+        if doc is None:
+            response.status_code = status_code
+            return err
         doc = config.get((query.type == "node") &
                          (query.id == node_id) &
                          (query.key == key))
@@ -1302,6 +1283,10 @@ async def get_config(response: Response, key: str = "", package: str = "", node_
             return {"value": doc["value"]}
 
     if package:
+        (doc, status_code, err) = package_exists(package)
+        if doc is None:
+            response.status_code = status_code
+            return err
         doc = config.get((query.type == "package") &
                          (query.id == package) &
                          (query.key == key))
@@ -1410,4 +1395,4 @@ async def delete_config(key: str, type: str, response: Response, id: str = ""):
                 " unable to delete it"
             }
 
-    return {}
+            return {}

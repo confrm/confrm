@@ -237,7 +237,7 @@ def test_delete_package():
             response = client.delete("/package/" +
                                      "?name=not_there")
             assert response.status_code == 404
-            assert response.json()["error"] == "confrm-025"
+            assert response.json()["error"] == "confrm-000"
 
             # Test delete the package
             response = client.delete("/package/" +
@@ -739,8 +739,8 @@ def test_config():
                                   "&id=package_z" +
                                   "&key=key_z"
                                   "&value=value_b")
-            assert response.status_code == 400
-            assert response.json()["error"] == "confrm-013"
+            assert response.status_code == 404
+            assert response.json()["error"] == "confrm-000"
 
             # Test for non-existing node
             response = client.put("/config/" +
@@ -748,8 +748,8 @@ def test_config():
                                   "&id=0:12:3:5" +
                                   "&key=key_x"
                                   "&value=value_x")
-            assert response.status_code == 400
-            assert response.json()["error"] == "confrm-014"
+            assert response.status_code == 404
+            assert response.json()["error"] == "confrm-001"
 
             # Test for no type given
             response = client.put("/config/" +
