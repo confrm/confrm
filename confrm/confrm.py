@@ -551,11 +551,6 @@ async def register_node(  # pylint: disable=R0913
         }
 
 
-    (package_doc, status_code, err) = package_exists(package)
-    if package_doc is None:
-        response.status_code = status_code
-        return err
-
     node_doc = nodes.get(query.node_id == node_id)
     if node_doc is None:
         entry = {
