@@ -1,13 +1,14 @@
 Confrm
 ======
 
-.. image:: https://github.com/confrm/confrm/workflows/Confrm%20Test/Deploy/badge.svg
+.. image:: https://github.com/confrm/confrm/workflows/Confrm%20Test/Deploy/badge.svg 
+.. image:: https://github.com/confrm/hwil_test/workflows/HWIL%20Testing/badge.svg
 
 Confrm is an application designed to make it easy to deploy IOT type applications across your network.
 
-Go to https://confrm.io/ to find quckstart guides and more information.
-
 It uses a Python based server to host application binaries, which connected IOT devices can poll for updates and configuration information.
+
+Go to https://confrm.io/ to find quickstart guides and https://confrm.readthedocs.org/ for more detailed documentation.
 
 Currently supported platforms are:
 
