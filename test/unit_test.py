@@ -196,7 +196,7 @@ def test_delete_package():
             assert response.status_code == 201
 
             # Add a package version - keep track of files in data directory
-            files = os.listdir(data_dir)
+            files = os.listdir(os.path.join(data_dir, "blob"))
             with open(test_file, "rb") as file_ptr:
                 response = client.post("/package_version/" +
                                        "?name=test_package" +
@@ -205,7 +205,7 @@ def test_delete_package():
                                        "&revision=3",
                                        files={"file": ("filename", file_ptr, "application/binary")})
                 assert response.status_code == 201
-            files_new = os.listdir(data_dir)
+            files_new = os.listdir(os.path.join(data_dir, "blob"))
 
             # Get the newly created file
             new_file = ""
@@ -213,7 +213,7 @@ def test_delete_package():
                 if filename not in files:
                     new_file = filename
             assert new_file
-            assert os.path.isfile(os.path.join(data_dir, new_file))
+            assert os.path.isfile(os.path.join(os.path.join(data_dir, "blob"), new_file))
 
             # Create a config for this package
             response = client.put("/config/" +
@@ -249,7 +249,7 @@ def test_delete_package():
             assert response.status_code == 404
 
             # Check the file was deleted too
-            assert not os.path.isfile(os.path.join(data_dir, new_file))
+            assert not os.path.isfile(os.path.join(os.path.join(data_dir, "blob"), new_file))
 
             # Test the config was deleted
             response = client.get("/config/" +
