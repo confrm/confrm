@@ -127,6 +127,12 @@ def do_config():
     # Create the database from the data store
     DB = TinyDB(os.path.join(CONFIG["storage"]["data_dir"], "confrm_db.json"))
 
+    # Check a blob folder exists
+    blob_dir = os.path.join(CONFIG["storage"]["data_dir"], "blob")
+    if not os.path.isdir(blob_dir):
+        os.mkdir(blob_dir)
+
+
 
 def get_package_versions(name: str, package: {} = None):
     """Handles the version ordering logic
@@ -877,7 +883,8 @@ async def add_package_version(
 
     # Store the binary in the data_store as a base64 encoded file
     filename = uuid.uuid4().hex
-    save_file = os.path.join(CONFIG["storage"]["data_dir"], filename)
+    blob_dir = os.path.join(CONFIG["storage"]["data_dir"], "blob")
+    save_file = os.path.join(blob_dir, filename)
     with open(save_file, "wb") as ptr:
         ptr.write(base64.b64encode(file))
 
@@ -954,8 +961,8 @@ async def delete_package_version(package: str, version: str, response: Response)
         }
 
     package_versions.remove(doc_ids=[version_entry.doc_id])
-    file_path = os.path.join(
-        CONFIG["storage"]["data_dir"], version_entry["blob_id"])
+    blob_dir = os.path.join(CONFIG["storage"]["data_dir"], "blob")
+    file_path = os.path.join(blob_dir, version_entry["blob_id"])
     os.remove(file_path)
 
     # Check for any hanging canary entries
@@ -1156,7 +1163,8 @@ async def get_blob(package: str, blob: str, response: Response):
         return {"ok": False, "info": "Specified blob does not exist for package"}
 
     # Read the file from the data store
-    with open(os.path.join(CONFIG["storage"]["data_dir"], blob), "rb") as ptr:
+    blob_dir = os.path.join(CONFIG["storage"]["data_dir"], "blob")
+    with open(os.path.join(blob_dir, blob), "rb") as ptr:
         data = base64.b64decode(ptr.read())
 
     # Create sha256 of data from store
