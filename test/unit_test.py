@@ -430,8 +430,8 @@ def test_post_package_version():
                 assert response.json()["error"] == "confrm-017"
 
 
-def test_put_node_package_via_package_version():
-    """Tests changing the package for a given node"""
+def test_set_node_package_version_with_new_package_version():
+    """Tests changing the package for a given node while adding new package version"""
 
     with tempfile.TemporaryDirectory() as data_dir:
         config_file = os.path.join(data_dir, CONFIG_NAME)
@@ -481,7 +481,7 @@ def test_put_node_package_via_package_version():
             assert response.status_code == 200
 
             ###################################################################
-            ## To start with the registered node should get the active verion
+            ## To start with the registered node should get the active version
             ## for package_a.
             ##
             ## Once a version is added for package_b and the node is set as the
@@ -619,7 +619,7 @@ def test_put_node_package():
             assert response.status_code == 200
             assert response.json()["current_version"] == "0.1.0"
 
-            # Force the next version to be a different package using canary feature
+            # Force the next version to be a different package
             response = client.put("/node_package/" +
                                   "?node_id=0:12:3:4" +
                                   "&package=package_b")
@@ -633,35 +633,39 @@ def test_put_node_package():
             assert response.json()["current_version"] == "0.2.0"
             assert response.json()["force"]
 
-            # Put in a newer package versions for the packages, set as active - will overwrite canary
-            with open(test_file, "rb") as file_ptr:
-                response = client.post("/package_version/" +
-                                       "?name=package_a" +
-                                       "&major=0" +
-                                       "&minor=1" +
-                                       "&revision=1" +
-                                       "&set_active=true",
-                                       files={"file": ("filename", file_ptr, "application/binary")})
-                assert response.status_code == 201
+            # Delete the node package update
+            response = client.delete("/node_package/" +
+                                  "?node_id=0:12:3:4")
+            assert response.status_code == 200
 
-            with open(test_file, "rb") as file_ptr:
-                response = client.post("/package_version/" +
-                                       "?name=package_b" +
-                                       "&major=0" +
-                                       "&minor=2" +
-                                       "&revision=1" +
-                                       "&set_active=true",
-                                       files={"file": ("filename", file_ptr, "application/binary")})
-                assert response.status_code == 201
-
-            # Check for update - should be back to package_a with 0.0.1, not forced
+            # Check for update (will be back to package_a with version 0.1.0)
             response = client.get("/check_for_update/" +
                                   "?node_id=0:12:3:4" +
                                   "&package=package_a")
             assert response.status_code == 200
-            assert response.json()["current_version"] == "0.1.1"
-            assert not response.json()["force"]
+            assert response.json()["current_version"] == "0.2.0"
+            assert response.json()["force"]
 
+            # Force the next version to be a different package
+            response = client.put("/node_package/" +
+                                  "?node_id=0:12:3:4" +
+                                  "&package=package_b")
+            assert response.status_code == 200
+
+            # Re-Register node using new package
+            response = client.put("/register_node/" +
+                                  "?node_id=0:12:3:4" +
+                                  "&package=package_b" +
+                                  "&version=0.2.0" +
+                                  "&description=some%20description" +
+                                  "&platform=esp32")
+            assert response.status_code == 200
+
+            # Try to delete the node package update
+            response = client.delete("/node_package/" +
+                                  "?node_id=0:12:3:4")
+            assert response.status_code == 404
+            assert response.json()["error"] == "confrm-xxx"
 
 
 def test_config():
