@@ -13,10 +13,10 @@ Four programs need to be build, with different permutations as described:
 =============  ====================  =======
 Package Name   Permutation           Version
 =============  ====================  =======
-flasher        reset config enabled  0.0.1
-flasher        fast_flash            1.0.0
-flasher        medium_flash          1.0.1
-flasher        slow_flash            1.0.2
+flasher        reset config enabled  
+flasher        fast flashing         1.0.0
+flasher        medium flashing       1.0.1
+flasher        slow flashing         1.0.2
 config_getter                        0.1.0
 sos                                  1.0.2
 =============  ====================  =======
@@ -35,11 +35,11 @@ The "sos" program will flash the LED in an "SOS" sequence.
 Serial 1 - Node Detection
 -------------------------
 
-Program all ESP32 devices with version 0.0.1 of flasher, this will reset the config.
+Program all ESP32 devices with the reset config version of flasher.
 
 Check that all nodes show up in the nodes screen, give each node an identifiable title.
 
-This serial passes if all nodes are detected and displayed correctly (package is "flasher" and version is 0.0.1) and if the titles are correctly applied.
+This serial passes if all nodes are detected and displayed correctly (package is "flasher") and if the titles are correctly applied.
 
 
 Serial 2 - Package Update
@@ -47,7 +47,7 @@ Serial 2 - Package Update
 
 On the packages screen create a new package called "flasher" with a title of "Flasher", description of "LED Flasher" and platform of "esp32".
 
-Upload a new package version for flasher, being the fast_flash binary with version 1.0.0. Set the deployment  strategy as "Immediate".
+Upload a new package version for flasher, being the flasher_fast binary with version 1.0.0. Set the deployment  strategy as "Immediate".
 
 Once uploaded ensure that all ESP32 devices have updated to the new version using the nodes screen.
 
@@ -57,11 +57,11 @@ This serial passes if the nodes are updated to flasher version 1.0.0 and the LED
 Serial 3 - Package Deployments
 ------------------------------
 
-On the package screen upload a new package version for the flasher, being the medium_flash binary with version 1.0.1. Set the deployment strategy to "Upload Only".
+On the package screen upload a new package version for the flasher, being the flasher binary with version 1.0.1. Set the deployment strategy to "Upload Only".
 
 Confirm that none of the ESP32's have been updated using the node screen and by observing the LED flash speed.
 
-On the package screen upload a new package version for the flasher, being the slow_flash binary with version 1.0.2. Set the deployment strategy to "Canary" and select one of the nodes from the drop down list.
+On the package screen upload a new package version for the flasher, being the flasher binary with version 1.0.2. Set the deployment strategy to "Canary" and select one of the nodes from the drop down list.
 
 Confirm that only that node updates using the node screen and by observing the LED flash speed.
 
