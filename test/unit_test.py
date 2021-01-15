@@ -643,8 +643,8 @@ def test_put_node_package():
                                   "?node_id=0:12:3:4" +
                                   "&package=package_a")
             assert response.status_code == 200
-            assert response.json()["current_version"] == "0.2.0"
-            assert response.json()["force"]
+            assert response.json()["current_version"] == "0.1.0"
+            assert not response.json()["force"]
 
             # Force the next version to be a different package
             response = client.put("/node_package/" +
@@ -665,7 +665,7 @@ def test_put_node_package():
             response = client.delete("/node_package/" +
                                   "?node_id=0:12:3:4")
             assert response.status_code == 404
-            assert response.json()["error"] == "confrm-xxx"
+            assert response.json()["error"] == "confrm-007"
 
 
 def test_config():

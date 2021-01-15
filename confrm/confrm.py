@@ -18,12 +18,12 @@ Codes:
 
     000 ERROR    -           -                       Package not found
     001 ERROR    -           -                       Node not found
-    002 ERROR
+    002 ERROR    -           -                       Package version not found
     003 ERROR    PUT         /package/               Package already exists
     004 ERROR    PUT         /package/               Package name cannot be empty
     005 ERROR    PUT         /register_node/         Node id is invalid
     006 ERROR    PUT         /package_version/       Version already exists for package
-    007
+    007 ERROR    DELETE      /node_package/          Node does not have a force package entry
     008 ERROR    PUT         /node_package/          Package has no active version
     009
     010 ERROR    PUT         /package/               Package name does not match pattern
@@ -131,7 +131,6 @@ def do_config():
     blob_dir = os.path.join(CONFIG["storage"]["data_dir"], "blob")
     if not os.path.isdir(blob_dir):
         os.mkdir(blob_dir)
-
 
 
 def get_package_versions(name: str, package: {} = None):
@@ -405,7 +404,7 @@ def package_exists(package: str):
     package_doc = packages.get(query.name == package)
     if package_doc is None:
         msg = "Package not found"
-        return (None, status.HTTP_404_NOT_FOUND,{
+        return (None, status.HTTP_404_NOT_FOUND, {
             "error": "confrm-000",
             "message": msg,
             "detail": "The package specified was not found"
@@ -425,7 +424,7 @@ def node_exists(node_id: str):
     node_doc = nodes.get(query.node_id == node_id)
     if node_doc is None:
         msg = "Node not found"
-        return (None, status.HTTP_404_NOT_FOUND,{
+        return (None, status.HTTP_404_NOT_FOUND, {
             "error": "confrm-001",
             "message": msg,
             "detail": "The node specified was not found"
@@ -496,7 +495,7 @@ async def get_canary_api(response: Response, node_id: str = ""):
         response (Response): Starlette response object for setting return codes
     """
 
-    canary = get_canary(node_id = node_id)
+    canary = get_canary(node_id=node_id)
     if canary is None:
         msg = "Canary entry not found"
         logging.info(msg)
@@ -589,6 +588,10 @@ async def register_node(  # pylint: disable=R0913
     node_doc["ip_address"] = request.client.host
 
     nodes.update(node_doc, query.node_id == node_id)
+
+    # Check if force package change
+    if "force" in node_doc.keys() and node_doc["package"] == node_doc["force"]["package"]:
+        nodes.update(delete("force"), query.node_id == node_id)
 
     # Check to see if a canary
     canary = get_canary(node_id=node_id)
@@ -829,7 +832,8 @@ async def add_package_version(
     package_versions = DB.table("package_versions")
     query = Query()
 
-    (package_doc, status_code, err) = package_exists(package_version_dict["name"])
+    (package_doc, status_code, err) = package_exists(
+        package_version_dict["name"])
     if package_doc is None:
         response.status_code = status_code
         return err
@@ -1016,11 +1020,33 @@ async def check_for_update(package: str, node_id: str, response: Response):
     """
 
     packages = DB.table("packages")
+    nodes = DB.table("nodes")
     query = Query()
+
+    # Precedence is, node force, package canary then package version
+
+    node_doc = nodes.get(query.node_id == node_id)
+    if node_doc and "force" in node_doc.keys():
+        version_doc = get_package_version_by_version_string(
+            node_doc["force"]["package"],
+            node_doc["force"]["version"]
+        )
+        if version_doc is None:
+            # TODO Create test
+            logging.error("Force version not set, removing force entry...")
+            nodes.update(delete("force"), query.node_id == node_id)
+        else:
+            return {
+                "current_version": node_doc["force"]["version"],
+                "blob": version_doc["blob_id"],
+                "hash": version_doc["hash"],
+                "force": True
+            }
 
     package_canary = get_canary(package=package)
     if package_canary is not None and package_canary["node_id"] == "*":
-        set_canary(node_id=node_id, package=package, version=package_canary["version"])
+        set_canary(node_id=node_id, package=package,
+                   version=package_canary["version"])
 
     # Check to see if there is a canary entry for this node
     canary = get_canary(node_id=node_id)
@@ -1030,6 +1056,7 @@ async def check_for_update(package: str, node_id: str, response: Response):
             canary["version"]
         )
         if version_doc is None:
+            # TODO: Create test
             logging.error("Canary version not set, removing canary entry...")
             remove_canary(node_id=node_id)
         else:
@@ -1049,10 +1076,9 @@ async def check_for_update(package: str, node_id: str, response: Response):
             "detail": "Package not found"
         }
 
-
     if "current_version" in package_doc.keys():
         version_entry = get_package_version_by_version_string(
-                package,
+            package,
             package_doc["current_version"])
         return {
             "current_version": package_doc["current_version"],
@@ -1063,11 +1089,11 @@ async def check_for_update(package: str, node_id: str, response: Response):
 
     response.status_code = status.HTTP_404_NOT_FOUND
     return {
-       "error": "confrm-011",
-       "message": "No versions found for package",
-       "detail": "While checking for updates the package was found in the database, " +
-       "however there are no available versions of that package"
-       }
+        "error": "confrm-011",
+        "message": "No versions found for package",
+        "detail": "While checking for updates the package was found in the database, " +
+        "however there are no available versions of that package"
+    }
 
 
 @APP.put("/set_active_version/")
@@ -1102,7 +1128,7 @@ async def set_active_version(package: str, version: str):
 
 @APP.put("/node_package/", status_code=status.HTTP_200_OK)
 async def node_package(node_id: str, package: str, response: Response, version: str = ""):
-    """Force a node to use a particular package using canary feature"""
+    """Force a node to use a particular package"""
 
     (package_doc, status_code, err) = package_exists(package)
     if package_doc is None:
@@ -1125,10 +1151,9 @@ async def node_package(node_id: str, package: str, response: Response, version: 
         version_doc = get_package_version_by_version_string(package, version)
         if version_doc is None:
             msg = "Package version not found"
-            logging.info(msg)
             response.status_code = status.HTTP_404_NOT_FOUND
             return {
-                "error": "confrm-018",
+                "error": "confrm-002",
                 "message": msg,
                 "detail": "While attempting to set a node to use a particular package the " +
                 " version given was not found"
@@ -1139,7 +1164,39 @@ async def node_package(node_id: str, package: str, response: Response, version: 
         response.status_code = status_code
         return err
 
-    set_canary(package=package, version=version, node_id=node_id)
+    node_doc["force"] = {
+        "package": package,
+        "version": version
+    }
+
+    nodes = DB.table("nodes")
+    query = Query()
+    nodes.update(node_doc, query.node_id == node_id)
+
+    return {}
+
+
+@APP.delete("/node_package/", status_code=status.HTTP_200_OK)
+async def node_package(node_id: str, response: Response):
+    """Delete entry forcing a node to use a particular package"""
+
+    (node_doc, status_code, err) = node_exists(node_id)
+    if node_doc is None:
+        response.status_code = status_code
+        return err
+
+    if "force" not in node_doc.keys():
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return {
+            "error": "confrm-007",
+            "message": "Node does not have a force package entry",
+            "detail": "While attempting to remove a package forcing entry for node" +
+            f" {node_id} no node forcing entry was found"
+        }
+
+    nodes = DB.table("nodes")
+    query = Query()
+    nodes.update(delete("force"), query.node_id == node_id)
 
     return {}
 
