@@ -1,7 +1,7 @@
 Confrm
 ======
 
-.. image:: https://github.com/confrm/confrm/workflows/Confrm%20Test/Deploy/badge.svg 
+.. image:: https://github.com/confrm/confrm/workflows/Test/Deploy/badge.svg
 
 Confrm is an application designed to make it easy to deploy IOT type applications across your network.
 
