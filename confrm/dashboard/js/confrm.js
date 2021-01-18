@@ -1,5 +1,5 @@
 
-document.addEventListener("DOMContentLoaded", function () {
+//document.addEventListener("DOMContentLoaded", function () {
   // Handler when all assets (including images) are loaded
   let nav_elements = [
     {
@@ -201,31 +201,31 @@ document.addEventListener("DOMContentLoaded", function () {
 
       $('.packages-set-active').unbind("click");
       $('.packages-set-active').click(function (sender) {
-        let package = sender.currentTarget.dataset.packageName;
+        let package_name = sender.currentTarget.dataset.packageName;
         let version = sender.currentTarget.dataset.version;
         let data = $.ajax({
-          url: "/set_active_version/?package=" + name + "&version=" + version,
+          url: "/set_active_version/?package=" + package_name + "&version=" + version,
           type: "PUT"
         }).then(function (data) {
-          setPackageVersionsModal(name);
+          setPackageVersionsModal(package_name);
         });
       });
 
       $('.packages-delete-version').unbind("click");
       $('.packages-delete-version').click(function (sender) {
-        let package = sender.currentTarget.dataset.packageName;
+        let package_name = sender.currentTarget.dataset.packageName;
         let version = sender.currentTarget.dataset.version;
 
-        let url = "/package_version/?package=" + name + "&version=" + version;
+        let url = "/package_version/?package=" + package_name + "&version=" + version;
         let data = $.ajax({
           url: url,
           type: "DELETE"
         }).fail(function (jqXHR, textStatus, errorThrown) {
           let json = jqXHR.responseJSON;
           addAlert(json.message, json.detail, "ERROR");
-          setPackageVersionsModal(name);
+          setPackageVersionsModal(package_name);
         }).done(function (data, textStatus, jqXHR) {
-          setPackageVersionsModal(name);
+          setPackageVersionsModal(package_name);
         });
 
       });
@@ -257,8 +257,8 @@ document.addEventListener("DOMContentLoaded", function () {
         current_packages.push(entry);
 
         let is_drawn = false;
-        for (let package in drawn_packages) {
-          if (drawn_packages[package] === entry) {
+        for (let package_name in drawn_packages) {
+          if (drawn_packages[package_name] === entry) {
             is_drawn = true;
           }
         }
@@ -518,13 +518,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
         let inputs = $("#modal-package-confirm").find("input");
 
-        let package = "";
+        let package_name = "";
 
         for (let input in inputs) {
           let val = inputs[input].value;
           switch (inputs[input].name) {
             case "package":
-              package = val;
+              package_name = val;
               break;
             default:
               break;
@@ -532,7 +532,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         let url = "/package/";
-        url += "?name=" + package;
+        url += "?name=" + package_name;
 
         let data = $.ajax({
           url: url,
@@ -794,12 +794,12 @@ document.addEventListener("DOMContentLoaded", function () {
         }).then(function (data) {
 
           let html = `<select class="form-select" name="package">`;
-          for (let package in data) {
-            html += `<option value="` + data[package].name + `"`;
-            if (data[package].name === current_package) {
+          for (let package_name in data) {
+            html += `<option value="` + data[package_name].name + `"`;
+            if (data[package_name].name === current_package) {
               html += ` selected`;
             }
-            html += `">` + data[package].title + ` (` + data[package].name + `)</option>`
+            html += `">` + data[package_name].title + ` (` + data[package_name].name + `)</option>`
           }
           html += `</select>`;
           html += ` <input type="hidden" name="type" value="package">`;
@@ -1138,8 +1138,8 @@ document.addEventListener("DOMContentLoaded", function () {
               <div class="mb-3">
                 <label class="form-label">Package</label>
                 <select class="form-select" name="package">`;
-            for (let package in data) {
-              html += `<option value="` + data[package].name + `">` + data[package].title + ` (` + data[package].name + `)</option>`;
+            for (let package_name in data) {
+              html += `<option value="` + data[package_name].name + `">` + data[package_name].title + ` (` + data[package_name].name + `)</option>`;
             }
             html += `
                 </select>
@@ -1204,7 +1204,7 @@ document.addEventListener("DOMContentLoaded", function () {
         let type = "";
         let value = "";
         let key = "";
-        let package = "";
+        let package_name = "";
         let node_id = "";
 
         for (let input in inputs) {
@@ -1226,14 +1226,14 @@ document.addEventListener("DOMContentLoaded", function () {
         inputs = $("#modal-config-add .modal-body").find("select");
         for (let input in inputs) {
           if (inputs[input].name === "package") {
-            package = inputs[input].value;
+            package_name = inputs[input].value;
           } else if (inputs[input].name === "node") {
             node_id = inputs[input].value;
           }
         }
 
         let id = "";
-        if ("package" === type) id = package;
+        if ("package" === type) id = package_name;
         else if ("node" === type) id = node_id;
 
         let url = "/config/";
@@ -1383,5 +1383,5 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-});
+//});
 
