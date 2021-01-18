@@ -36,9 +36,9 @@
   var active_package = "";
 
   // For storing which up elements have been drawn
-  drawn_nodes = [];
-  drawn_packages = [];
-  drawn_configs = [];
+  let drawn_nodes = [];
+  let drawn_packages = [];
+  let drawn_configs = [];
 
   // Call the update function every 1200ms
   setInterval(updateUIEvent, 1200);
@@ -878,7 +878,7 @@
 
         } else if ("package" === type) {
 
-          let node_id = "", package = "";
+          let node_id = "", package_name = "";
 
           for (let input in inputs) {
             if ("node_id" === inputs[input].name) {
@@ -890,13 +890,13 @@
 
           for (let select in selects) {
             if ("package" === selects[select].name) {
-              package = selects[select].value;
+              package_name = selects[select].value;
             }
           }
 
           let url = "/node_package/";
           url += "?node_id=" + node_id;
-          url += "&package=" + package;
+          url += "&package=" + package_name;
 
           let data = $.ajax({
             url: url,
