@@ -31,7 +31,7 @@ export function updatePackagesTable(clear = false) {
 
       // Version is a list, process to first element
       let version = "", manage_versions = "";
-      
+
       if (row["versions"].length == 0) {
         manage_versions = "disabled";
         version = "None";
@@ -246,7 +246,7 @@ export function updatePackagesTable(clear = false) {
         contentType: false   // tell jQuery not to set contentType
       }).fail(function (jqXHR, textStatus, errorThrown) {
         let json = jqXHR.responseJSON;
-        addAlert(json.message, json.detail, "ERROR");
+        window.addAlert(json.message, json.detail, "ERROR");
         $(".package-add-submit").unbind("click");
         $("#modal-package-upload [data-bs-dismiss=modal]").trigger({ type: "click" });
       }).done(function (data, textStatus, jqXHR) {
@@ -256,10 +256,10 @@ export function updatePackagesTable(clear = false) {
         redrawPackagesTable();
         let json = jqXHR.responseJSON;
         if ("undefined" !== typeof json.warning) {
-          addAlert(json.message, json.detail, "WARNING");
+          window.addAlert(json.message, json.detail, "WARNING");
         }
         if ("undefined" !== typeof json.info) {
-          addAlert(json.message, json.detail, "INFO");
+          window.addAlert(json.message, json.detail, "INFO");
         }
 
       });
@@ -304,7 +304,7 @@ export function updatePackagesTable(clear = false) {
         type: "DELETE"
       }).fail(function (jqXHR, textStatus, errorThrown) {
         let json = jqXHR.responseJSON;
-        addAlert(json.message, json.detail, "ERROR");
+        window.addAlert(json.message, json.detail, "ERROR");
         $(".modal-package-confirm-yes").unbind("click");
         $("#modal-package-confirm [data-bs-dismiss=modal]").trigger({ type: "click" });
       }).done(function (data, textStatus, jqXHR) {
@@ -329,7 +329,7 @@ export function updatePackagesTable(clear = false) {
           let disabled = '';
           if (data.length > 0) {
             options = `<br /><select class="form-select package-deployment-canary-nodes" style="display: none">`;
-            for (node in data) {
+            for (let node in data) {
               let nid = data[node].node_id;
               options += `<option value="` + nid + `">` + nid + `</option>`;
             }
@@ -442,7 +442,7 @@ export function updatePackagesTable(clear = false) {
         type: "PUT"
       }).fail(function (jqXHR, textStatus, errorThrown) {
         let json = jqXHR.responseJSON;
-        addAlert(json.message, json.detail, "ERROR");
+        window.addAlert(json.message, json.detail, "ERROR");
         $(".package-add-submit").unbind("click");
         $("#modal-package-add [data-bs-dismiss=modal]").trigger({ type: "click" });
       }).done(function (data, textStatus, jqXHR) {
@@ -541,7 +541,7 @@ function setPackageVersionsModal(name) {
         type: "DELETE"
       }).fail(function (jqXHR, textStatus, errorThrown) {
         let json = jqXHR.responseJSON;
-        addAlert(json.message, json.detail, "ERROR");
+        window.addAlert(json.message, json.detail, "ERROR");
         setPackageVersionsModal(package_name);
       }).done(function (data, textStatus, jqXHR) {
         setPackageVersionsModal(package_name);
