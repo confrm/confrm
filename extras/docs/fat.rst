@@ -57,11 +57,11 @@ This serial passes if the nodes are updated to flasher version 1.0.0 and the LED
 Serial 3 - Package Deployments
 ------------------------------
 
-On the package screen upload a new package version for the flasher, being the flasher binary with version 1.0.1. Set the deployment strategy to "Upload Only".
+On the package screen upload a new package version for the flasher, being the flasher_medium binary with version 1.0.1. Set the deployment strategy to "Upload Only".
 
 Confirm that none of the ESP32's have been updated using the node screen and by observing the LED flash speed.
 
-On the package screen upload a new package version for the flasher, being the flasher binary with version 1.0.2. Set the deployment strategy to "Canary" and select one of the nodes from the drop down list.
+On the package screen upload a new package version for the flasher, being the flasher_slow binary with version 1.0.2. Set the deployment strategy to "Canary" and select one of the nodes from the drop down list.
 
 Confirm that only that node updates using the node screen and by observing the LED flash speed.
 
@@ -81,7 +81,7 @@ Upload the binary for that package as version 0.1.0 and set the deployment strat
 
 On the nodes screen, press the "Action" button for one of the nodes and change package from "Flasher" to "Config Getter".
 
-Confirm that the LED of that node stops flashing and that the information in the nodes tab reflects the change of package.
+Confirm that the information in the nodes tab reflects the change of package.
 
 Change at least one other node to use the "Config Getter" package.
 
@@ -91,7 +91,7 @@ This serial passes if the update occurs as expected.
 Serial 5 - Setting Configurations
 ---------------------------------
 
-In the configuration screen click on "Add new config", select global and create a configuration called "flash_time" and set it to 100.
+In the configuration screen click on "Add new config", select global and create a configuration called "flash_time" and set it to 25.
 
 Confirm that the nodes set to use the "Config Getter" package start flashing.
 
