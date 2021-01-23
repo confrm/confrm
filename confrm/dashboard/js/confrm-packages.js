@@ -151,6 +151,10 @@ export function updatePackagesTable(clear = false) {
         $('.modal-package-version-info').html(html);
       });
 
+      // Set the form focus
+      $('#modal-package-upload').on('shown.bs.modal', function() {
+        $('input[name="major"]')[0].focus();
+      });
 
       // Reset the form contents
       $(".package-upload-version").find("input").each(function (id, input) {
@@ -396,6 +400,10 @@ export function updatePackagesTable(clear = false) {
       }
 
     });
+
+    $('#modal-package-add').on('shown.bs.modal', function() {
+      $('#package-add-input-name').focus();
+    })
 
     $(".package-add-submit").unbind("click");
     $(".package-add-submit").click(function () {
