@@ -165,6 +165,7 @@ export function updatePackagesTable(clear = false) {
       $("#package-upload-file")[0].value = "";
       $(".package-deployment-select")[0].value = "immediate";
       $(".package-deployment-canary-nodes").hide();
+      $(".package-deployment-canary").html("");
     });
 
     $(".package-upload-submit").unbind("click");
