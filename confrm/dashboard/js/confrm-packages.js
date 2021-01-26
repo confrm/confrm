@@ -56,7 +56,7 @@ export function updatePackagesTable(clear = false) {
                 <div class="dropdown-menu dropdown-menu-end">
                   <div class="dropdown-item packages-action-upload" style="cursor:pointer" 
                     data-bs-toggle="modal" data-bs-target="#modal-package-upload" data-package-name="` + entry + `"
-                    data-package-title="` + row.title + `" data-bs-backdrop="static" data-bs-keyboard="false">
+                    data-package-title="` + row.title + `" data-bs-backdrop="static">
                     Upload new version
                   </div>
                   <div class="dropdown-item packages-info-button ` + manage_versions + `" style="cursor:pointer;" 
@@ -152,6 +152,7 @@ export function updatePackagesTable(clear = false) {
       });
 
       // Set the form focus
+      $('#modal-package-upload').off('shown.bs.modal');
       $('#modal-package-upload').on('shown.bs.modal', function() {
         $('input[name="major"]')[0].focus();
       });
@@ -402,6 +403,7 @@ export function updatePackagesTable(clear = false) {
 
     });
 
+    $('#modal-package-add').off('shown.bs.modal');
     $('#modal-package-add').on('shown.bs.modal', function() {
       $('#package-add-input-name').focus();
     })

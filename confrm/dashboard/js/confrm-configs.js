@@ -43,13 +43,12 @@ export function updateConfigsTable(clear = false) {
             <div class="dropdown-item config-edit-button" style="cursor:pointer" 
               data-bs-toggle="modal" data-bs-target="#modal-config" data-key="` + row.key + `"
               data-id="` + row.id + `" data-type="` + row.type + `" data-value="` + row.value + `"
-              data-bs-backdrop="static" data-bs-keyboard="false">
+              data-bs-backdrop="static">
               Edit
             </div>
             <div class="dropdown-item config-delete-button" style="cursor:pointer" 
               data-bs-toggle="modal" data-bs-target="#modal-config-confirm" data-key="` + row.key + `"
-              data-id="` + row.id + `" data-type="` + row.type + `" data-bs-backdrop="static"
-              data-bs-keyboard="false">
+              data-id="` + row.id + `" data-type="` + row.type + `" data-bs-backdrop="static">
               Delete
             </div>
           </div>
@@ -108,6 +107,13 @@ export function updateConfigsTable(clear = false) {
     `;
 
       $("#modal-config .modal-body").html(html);
+
+      $('#modal-config').off('shown.bs.modal');
+      $('#modal-config').on('shown.bs.modal', function() {
+        $('input[name="value"]')[0].focus();
+      });
+
+
     });
 
     /*
@@ -210,6 +216,12 @@ export function updateConfigsTable(clear = false) {
       `;
         html += ` <input type="hidden" name="type" value="global">`;
         $("#modal-config-add .modal-body").html(html);
+
+        $('#modal-config-add').off('shown.bs.modal');
+        $('#modal-config-add').on('shown.bs.modal', function() {
+          $('input[name="key"]')[0].focus();
+        });
+
       } else if ("package" === type) {
         $("#modal-config-add .modal-title").html("Add package config");
         let data = $.ajax({
@@ -242,6 +254,12 @@ export function updateConfigsTable(clear = false) {
 
           $("#modal-config-add .modal-body").html(html);
         });
+
+        $('#modal-config-add').off('shown.bs.modal');
+        $('#modal-config-add').on('shown.bs.modal', function() {
+          $('select[name="package"]')[0].focus();
+        });
+
       } else if ("node" === type) {
         $("#modal-config-add .modal-title").html("Add package config");
         let data = $.ajax({
@@ -274,7 +292,14 @@ export function updateConfigsTable(clear = false) {
 
           $("#modal-config-add .modal-body").html(html);
         });
+
+        $('#modal-config-add').off('shown.bs.modal');
+        $('#modal-config-add').on('shown.bs.modal', function() {
+          $('select[name="node"]')[0].focus();
+        });
+
       }
+
     });
 
     /*
