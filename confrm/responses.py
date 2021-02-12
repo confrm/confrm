@@ -15,6 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+import hashlib
+
 from fastapi.responses import Response
 from starlette.types import Receive, Scope, Send
 
@@ -48,6 +50,9 @@ class ConfrmFileResponse(Response):
             self._headers_set = True
             content_length = str(len(self.data))
             self.headers.setdefault("content-length", content_length)
+            m = hashlib.md5()
+            m.update(self.data)
+            self.headers.setdefault("x-MD5", m.hexdigest())
             await send({
                     "type": "http.response.start",
                     "status": 200,
