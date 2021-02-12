@@ -6,7 +6,7 @@ on:
       - '**'
     tags:
       - 'v*'
-    pull_reqeust:
+    pull_request:
 
 jobs:
   test:
