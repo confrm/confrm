@@ -11,7 +11,7 @@ Go to https://confrm.io/ to find quickstart guides and https://confrm.readthedoc
 
 Currently supported platforms are:
 
-* ESP32 - https://github.com/confrm/confrm-arduino-esp32/
+* ESP32, ESP8266 - https://github.com/confrm/confrm-arduino-esp/
 
 To build and run the sever as a service on a raspberry pi::
 
