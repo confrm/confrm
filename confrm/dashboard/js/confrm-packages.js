@@ -1,6 +1,20 @@
 let active_package = "";
 let drawn_packages = [];
 
+/*
+ * Screen as one primary button at the top and a table containg the packages which are currently installed on the server.
+ *
+ * The top button automatically opens the modal with ID "modal-package-add". The button initiates two callbacks, a click
+ * event and an on event. The click event is triggered immediately when the button is clicked and the on event is
+ * triggered when the modal has been loaded.
+ * 
+ *  > $('#modal-package-upload').on
+ *  > $('#modal-package-upload').click
+ * 
+ * Each row of the table has a drop down where options can be selected.
+ * 
+ */
+
 export function updatePackagesTable(clear = false) {
 
   if (clear === true) {
@@ -11,6 +25,20 @@ export function updatePackagesTable(clear = false) {
     url: "/packages/",
     type: "GET"
   }).then(function (data) {
+
+    /*
+     * This for loop draws the table to a table body with ID "#packages-table-body"
+     *
+     * The draw_packages list is used to track if package have already been drawn to the table, if not then
+     * the HTML is generated and appended to the div.
+     * 
+     * A dropdown list is populated and uses the data-package-name method to pass which row the click event
+     * came from.
+     * 
+     * If a package has already been drawn, the fields are checked to see if any of the content has changed,
+     * the individual cells will update their content rather than the row being redrawn to avoid any
+     * flickering on the interface.
+     */
 
     let current_packages = [];
     for (let entry in data) {
@@ -28,10 +56,11 @@ export function updatePackagesTable(clear = false) {
         }
       }
 
-
       // Version is a list, process to first element
       let version = "", manage_versions = "";
 
+      // manage_versions is used to disable the option to open the manage versions modal if there are no
+      // version to be mananged.
       if (row["versions"].length == 0) {
         manage_versions = "disabled";
         version = "None";
@@ -40,7 +69,6 @@ export function updatePackagesTable(clear = false) {
       }
 
       if (!is_drawn) {
-
 
         html += `<tr id="package-` + entry + `">`;
         html += `<td class="package-title">` + row["title"] + ` <span class="text-muted">(` + entry + `)</span></td>`;
@@ -77,11 +105,26 @@ export function updatePackagesTable(clear = false) {
             </td>`;
         html += "</tr>";
 
-
         $("#packages-table-body").append(html);
         drawn_packages.push(entry);
 
       } else {
+
+        /*
+         * This section checks to see if there have been any content changed for already drawn rows.
+         * 
+         * This is semi-automated using the headings array. Each row has an ID which is made up:
+         * 
+         *   #package-[name]-[heading]
+         * 
+         * That is stored in current, the type is extracted and a comparison made. JS will assign numbers
+         * as numbers, so allowance for that is made.
+         * 
+         * Title and version are not simple value checks, title is formed of two data sources so the formatted
+         * HTML needs to be created before the comparison and version change should initiate a hole table
+         * redraw.
+         */
+
         let headings = ["title", "description", "version", "platform"];
         let package_row_id = "#package-" + entry;
         for (let heading in headings) {
@@ -153,7 +196,7 @@ export function updatePackagesTable(clear = false) {
 
       // Set the form focus
       $('#modal-package-upload').off('shown.bs.modal');
-      $('#modal-package-upload').on('shown.bs.modal', function() {
+      $('#modal-package-upload').on('shown.bs.modal', function () {
         $('input[name="major"]')[0].focus();
       });
 
@@ -403,9 +446,29 @@ export function updatePackagesTable(clear = false) {
 
     });
 
+    /*
+     * These are on the modal being displayed, rather than on the click event - the
+     * click event happens too early to set the focus.
+     */
     $('#modal-package-add').off('shown.bs.modal');
-    $('#modal-package-add').on('shown.bs.modal', function() {
+    $('#modal-package-add').on('shown.bs.modal', function () {
       $('#package-add-input-name').focus();
+    });
+
+    /*
+     * This clears the content of the fields which were previously set, has to be done
+     * on click to avoid the old content from showing up.
+     */
+    $('#modal-package-add').unbind('click');
+    $('#modal-package-add').click(function () {
+      let fields = $('#modal-package-add').find('input');
+      let names = ['name', 'description', 'title', 'platform'];
+      for (let field in fields) {
+        let element = fields[field];
+        if (names.includes(element.name)) {
+          element.value = '';
+        }
+      }
     })
 
     $(".package-add-submit").unbind("click");
